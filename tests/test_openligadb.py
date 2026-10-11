@@ -48,3 +48,22 @@ def test_real_fixture_parses():
     assert len(matches) > 200
     assert all(m.kickoff.tzinfo is not None for m in matches)
     assert all(m.competition == "BL" for m in matches)
+
+
+def _match(kickoff, results=(), goals=(), finished=False):
+    return {"matchDateTimeUTC": kickoff, "matchIsFinished": finished,
+            "team1": {"teamName": "A"}, "team2": {"teamName": "B"},
+            "matchResults": list(results), "goals": list(goals)}
+
+
+def test_unfinished_match_long_after_kickoff_is_not_live():
+    m = parse([_match("2026-10-09T18:30:00Z")], "BL", NOW)[0]
+    assert m.status is Status.FINISHED
+
+
+def test_live_prefers_newer_goal_over_halftime_result():
+    data = [_match("2026-10-11T11:00:00Z",
+                   results=[{"pointsTeam1": 1, "pointsTeam2": 0, "resultOrderID": 1}],
+                   goals=[{"scoreTeam1": 2, "scoreTeam2": 0}, {"scoreTeam1": 1, "scoreTeam2": 0}])]
+    m = parse(data, "BL", NOW)[0]
+    assert (m.home_goals, m.away_goals, m.status) == (2, 0, Status.LIVE)

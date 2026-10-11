@@ -1,4 +1,5 @@
 """Borderless, always-on-top overlay window with clock and scores."""
+import ctypes
 import queue
 import threading
 import tkinter as tk
@@ -16,6 +17,12 @@ COLORS = {Status.LIVE: "#4cff7a", Status.SCHEDULED: "#cccccc", Status.FINISHED: 
 FONT = "Segoe UI"
 TOPMOST_EVERY_MS = 5000
 POLL_MS = 500
+
+
+def _virtual_desktop() -> tuple[int, int, int, int]:
+    """Bounding box of all monitors (Windows virtual screen)."""
+    metric = ctypes.windll.user32.GetSystemMetrics
+    return metric(76), metric(77), metric(78), metric(79)
 
 
 def _score(m: Match) -> str:
@@ -36,6 +43,8 @@ class Overlay:
     def __init__(self, config_path: Path):
         self.config_path = config_path
         self.cfg = config.load(config_path)
+        if not config.on_screen(self.cfg, _virtual_desktop()):
+            self.cfg = dict(config.DEFAULTS)  # monitor gone or config broken
         self.service = ScoreService()
         self.results: queue.Queue[list[Match]] = queue.Queue()
         self.wake = threading.Event()

@@ -17,3 +17,17 @@ def load(path: Path) -> dict:
 
 def save(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data), encoding="utf-8")
+
+
+MIN_VISIBLE = 50
+
+
+def on_screen(cfg: dict, desktop: tuple[int, int, int, int]) -> bool:
+    """True if the saved position lies on the virtual desktop (x, y, width, height)."""
+    right, y = cfg.get("right"), cfg.get("y")
+    if right is None:
+        return isinstance(y, int)
+    if not isinstance(right, int) or not isinstance(y, int):
+        return False
+    dx, dy, dw, dh = desktop
+    return dx + MIN_VISIBLE <= right <= dx + dw and dy <= y <= dy + dh - MIN_VISIBLE

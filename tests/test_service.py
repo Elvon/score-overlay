@@ -29,3 +29,23 @@ def test_failing_source_keeps_cache():
     service = ScoreService({"b": flaky})
     assert service.refresh(NOW) == [VFB]
     assert service.refresh(NOW) == [VFB]
+
+
+def test_only_hot_sources_refetched_on_fast_cycle():
+    calls = {"hot": 0, "cold": 0}
+    cold_match = Match("BL", "C", "D", None, None, Status.SCHEDULED, NOW + timedelta(hours=5))
+
+    def hot(now):
+        calls["hot"] += 1
+        return [VFB]
+
+    def cold(now):
+        calls["cold"] += 1
+        return [cold_match]
+
+    service = ScoreService({"hot": hot, "cold": cold})
+    service.refresh(NOW)
+    service.refresh(NOW + timedelta(seconds=30))
+    assert calls == {"hot": 2, "cold": 1}
+    service.refresh(NOW + timedelta(minutes=11))
+    assert calls == {"hot": 3, "cold": 2}

@@ -1,4 +1,4 @@
-from overlay.config import DEFAULTS, load, save
+from overlay.config import DEFAULTS, load, on_screen, save
 
 
 def test_load_missing_returns_defaults(tmp_path):
@@ -19,3 +19,18 @@ def test_save_roundtrip(tmp_path):
 
 def test_defaults_anchor_right_edge():
     assert DEFAULTS == {"right": None, "y": 10}
+
+
+def test_position_on_screen_kept():
+    # virtual desktop spanning a left monitor: x from -1920 to 1920, y 0..1080
+    assert on_screen({"right": -10, "y": 10}, (-1920, 0, 3840, 1080))
+
+
+def test_position_off_screen_rejected():
+    assert not on_screen({"right": 5000, "y": 10}, (0, 0, 1920, 1080))
+    assert not on_screen({"right": 1900, "y": 2000}, (0, 0, 1920, 1080))
+    assert not on_screen({"right": "x", "y": None}, (0, 0, 1920, 1080))
+
+
+def test_default_position_counts_as_on_screen():
+    assert on_screen({"right": None, "y": 10}, (0, 0, 1920, 1080))

@@ -1,7 +1,7 @@
 """Decides which matches the overlay shows and how often to refresh."""
 from datetime import datetime, timedelta
 
-from overlay.model import Match, Status
+from overlay.model import LIVE_MAX, Match, Status
 
 BEFORE_KICKOFF = timedelta(hours=3)
 AFTER_KICKOFF = timedelta(hours=5)
@@ -41,10 +41,12 @@ def select(matches: list[Match], now: datetime) -> list[Match]:
     return sorted(result, key=lambda m: (not is_focus(m), m.kickoff))
 
 
+def is_hot(m: Match, now: datetime) -> bool:
+    """Live, or a focus match about to start / overdue to be reported as started."""
+    if m.status is Status.LIVE:
+        return True
+    return is_focus(m) and m.status is Status.SCHEDULED and -LIVE_MAX <= m.kickoff - now <= SOON
+
+
 def next_interval(shown: list[Match], now: datetime) -> int:
-    for m in shown:
-        if m.status is Status.LIVE:
-            return FAST_INTERVAL
-        if is_focus(m) and m.status is Status.SCHEDULED and timedelta(0) <= m.kickoff - now <= SOON:
-            return FAST_INTERVAL
-    return SLOW_INTERVAL
+    return FAST_INTERVAL if any(is_hot(m, now) for m in shown) else SLOW_INTERVAL

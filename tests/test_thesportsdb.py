@@ -44,3 +44,23 @@ def test_tsdb_halftime_and_cup():
           "strStatus": "HT", "strLeague": "DFB-Pokal"}
     m = parse([ev])[0]
     assert (m.status, m.minute, m.competition, m.home_goals) == (Status.LIVE, "HZ", "DFB", 1)
+
+
+def _ev(status, ts="2026-10-13T17:00:00"):
+    return {"strTimestamp": ts, "strHomeTeam": "1860 Munich", "strAwayTeam": "Bayreuth",
+            "intHomeScore": "2", "intAwayScore": "1", "strStatus": status,
+            "strLeague": "German Regionalliga Bayern"}
+
+
+def test_tsdb_long_form_finished():
+    assert parse([_ev("Match Finished")])[0].status is Status.FINISHED
+
+
+def test_tsdb_postponed_dropped():
+    for s in ["PST", "Postponed", "CANC", "Cancelled", "ABD", "AWD"]:
+        assert parse([_ev(s)]) == []
+
+
+def test_tsdb_live_status_long_after_kickoff_is_finished():
+    m = parse([_ev("2H", ts="2026-10-01T17:00:00")], now=datetime(2026, 10, 11, tzinfo=timezone.utc))[0]
+    assert m.status is Status.FINISHED

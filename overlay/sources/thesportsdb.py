@@ -1,13 +1,14 @@
 """TheSportsDB (free key "3"): TSV 1860 München, Regionalliga Bayern."""
 from datetime import datetime, timezone
 
-from overlay.model import Match, Status
+from overlay.model import LIVE_MAX, Match, Status
 from overlay.sources.http import get_json
 
 BASE = "https://www.thesportsdb.com/api/v1/json/3"
 TEAM_1860 = 134242
 
-FINISHED = {"FT", "AET", "PEN", "AP"}
+FINISHED = {"FT", "AET", "PEN", "AP", "Match Finished"}
+DROPPED = {"PST", "Postponed", "CANC", "Cancelled", "ABD", "Abandoned", "AWD", "WO"}
 NOT_STARTED = {"NS", "TBD", "", None}
 
 
@@ -18,11 +19,15 @@ def _goals(value) -> int | None:
         return None
 
 
-def parse(events: list[dict]) -> list[Match]:
+def parse(events: list[dict], now: datetime | None = None) -> list[Match]:
+    now = now or datetime.now(timezone.utc)
     matches = []
     for ev in events:
         raw = ev.get("strStatus")
-        if raw in FINISHED:
+        if raw in DROPPED:
+            continue
+        kickoff = datetime.fromisoformat(ev["strTimestamp"]).replace(tzinfo=timezone.utc)
+        if raw in FINISHED or (raw not in NOT_STARTED and now > kickoff + LIVE_MAX):
             status, minute = Status.FINISHED, None
         elif raw in NOT_STARTED:
             status, minute = Status.SCHEDULED, None
@@ -36,7 +41,7 @@ def parse(events: list[dict]) -> list[Match]:
             home_goals=None if scheduled else _goals(ev.get("intHomeScore")),
             away_goals=None if scheduled else _goals(ev.get("intAwayScore")),
             status=status,
-            kickoff=datetime.fromisoformat(ev["strTimestamp"]).replace(tzinfo=timezone.utc),
+            kickoff=kickoff,
             minute=minute,
         ))
     return matches

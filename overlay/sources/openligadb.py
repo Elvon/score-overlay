@@ -1,7 +1,7 @@
 """OpenLigaDB: Bundesliga (bl1), DFB-Pokal (dfb), Frauen-Bundesliga (ffb1)."""
 from datetime import datetime
 
-from overlay.model import Match, Status, season_for
+from overlay.model import LIVE_MAX, Match, Status, season_for
 from overlay.sources.http import get_json
 
 URL = "https://api.openligadb.de/getmatchdata/{league}/{season}"
@@ -13,12 +13,14 @@ def _parse_time(s: str) -> datetime:
 
 def _score(m: dict) -> tuple[int, int] | None:
     results = m.get("matchResults") or []
+    goals = m.get("goals") or []
+    # While running, goals are entered before the result rows are updated.
+    if goals and (not m.get("matchIsFinished") or not results):
+        g = max(goals, key=lambda g: g["scoreTeam1"] + g["scoreTeam2"])
+        return g["scoreTeam1"], g["scoreTeam2"]
     if results:
         r = max(results, key=lambda r: r.get("resultOrderID", 0))
         return r["pointsTeam1"], r["pointsTeam2"]
-    goals = m.get("goals") or []
-    if goals:
-        return goals[-1]["scoreTeam1"], goals[-1]["scoreTeam2"]
     return None
 
 
@@ -28,7 +30,7 @@ def parse(data: list[dict], competition: str, now: datetime) -> list[Match]:
         kickoff = _parse_time(m["matchDateTimeUTC"])
         if kickoff.year < 2000:  # placeholder for unscheduled matches
             continue
-        if m.get("matchIsFinished"):
+        if m.get("matchIsFinished") or now > kickoff + LIVE_MAX:
             status = Status.FINISHED
         elif kickoff <= now:
             status = Status.LIVE

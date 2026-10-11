@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from enum import Enum
 
 
@@ -7,6 +7,11 @@ class Status(Enum):
     SCHEDULED = "scheduled"
     LIVE = "live"
     FINISHED = "finished"
+
+
+# A match not marked finished this long after kickoff is treated as over
+# (postponed, or the source never updated it).
+LIVE_MAX = timedelta(hours=3)
 
 
 @dataclass(frozen=True)

@@ -69,3 +69,8 @@ def test_next_interval():
     assert next_interval([starting], NOW) == 30
     assert next_interval([waiting], NOW) == 600
     assert next_interval([], NOW) == 600
+
+
+def test_next_interval_fast_when_scheduled_focus_kickoff_passed():
+    late = mk("UCL", "VfB Stuttgart", "A", Status.SCHEDULED, NOW - timedelta(minutes=1))
+    assert next_interval([late], NOW) == 30
