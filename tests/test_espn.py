@@ -36,3 +36,16 @@ def test_espn_scheduled_has_no_score():
     event["status"]["type"]["state"] = "pre"
     m = parse({"events": [event]}, "UCL")[0]
     assert (m.home_goals, m.away_goals, m.status) == (None, None, Status.SCHEDULED)
+
+
+def test_schedule_returns_upcoming_vfb_matches():
+    from overlay.sources.espn import parse_schedule
+    data = json.loads((FIX / "espn_vfb_ucl_schedule.json").read_text(encoding="utf-8"))
+    matches = parse_schedule(data, "UCL")
+    assert all(m.status is Status.SCHEDULED for m in matches)
+    atletico = next(m for m in matches if m.away.startswith("Atl"))
+    assert atletico.home == "VfB Stuttgart"
+    assert atletico.kickoff == datetime(2026, 10, 20, 19, 0, tzinfo=timezone.utc)
+    assert atletico.competition == "UCL"
+    # the match that is live in the fixture is left to the scoreboard source
+    assert not any(m.home == "Slovan Bratislava" for m in matches)

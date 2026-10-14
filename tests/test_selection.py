@@ -74,3 +74,31 @@ def test_next_interval():
 def test_next_interval_fast_when_scheduled_focus_kickoff_passed():
     late = mk("UCL", "VfB Stuttgart", "A", Status.SCHEDULED, NOW - timedelta(minutes=1))
     assert next_interval([late], NOW) == 30
+
+
+def test_team_of():
+    from overlay.selection import team_of
+    assert team_of("VfB Stuttgart") == "VfB"
+    assert team_of("VfB Stuttgart Frauen") == "VfB Frauen"
+    assert team_of("TSV 1860 München") == "1860"
+    assert team_of("1860 Munich") == "1860"
+    assert team_of("VfB Stuttgart II") is None
+    assert team_of("Hamburger SV") is None
+
+
+def test_next_matches_one_line_per_team_not_shown():
+    from overlay.selection import next_matches
+    vfb_live = mk("UCL", "Slovan Bratislava", "VfB Stuttgart", Status.LIVE, NOW - H)
+    vfb_next = mk("BL", "Hamburger SV", "VfB Stuttgart", Status.SCHEDULED, NOW + 72 * H)
+    women_later = mk("FBL", "VfB Stuttgart Frauen", "SC Freiburg Frauen", Status.SCHEDULED, NOW + 200 * H)
+    women_next = mk("FBL", "SGS Essen Frauen", "VfB Stuttgart Frauen", Status.SCHEDULED, NOW + 100 * H)
+    l1860_next = mk("RLB", "1860 Munich", "Bayreuth", Status.SCHEDULED, NOW + 30 * H)
+    l1860_old = mk("RLB", "1860 Munich", "Ansbach 09", Status.FINISHED, NOW - 200 * H)
+    all_matches = [vfb_live, vfb_next, women_later, women_next, l1860_next, l1860_old]
+    result = next_matches(all_matches, shown=[vfb_live], now=NOW)
+    assert result == [("VfB Frauen", women_next), ("1860", l1860_next)]
+
+
+def test_next_matches_team_without_upcoming_match_omitted():
+    from overlay.selection import next_matches
+    assert next_matches([], shown=[], now=NOW) == []

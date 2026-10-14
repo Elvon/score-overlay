@@ -49,3 +49,16 @@ def test_only_hot_sources_refetched_on_fast_cycle():
     assert calls == {"hot": 2, "cold": 1}
     service.refresh(NOW + timedelta(minutes=11))
     assert calls == {"hot": 3, "cold": 2}
+
+
+def test_all_matches_includes_unshown_upcoming():
+    future = Match("BL", "Hamburger SV", "VfB Stuttgart", None, None, Status.SCHEDULED,
+                   NOW + timedelta(days=3))
+    service = ScoreService({"a": lambda now: [BL, future]})
+    assert service.refresh(NOW) == [BL]
+    assert set(service.all_matches()) == {BL, future}
+
+
+def test_default_fetchers_include_vfb_schedule():
+    from overlay.service import default_fetchers
+    assert "vfb_ucl_schedule" in default_fetchers()

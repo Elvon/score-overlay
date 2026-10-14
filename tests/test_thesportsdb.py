@@ -6,6 +6,8 @@ from overlay.model import Status
 from overlay.sources.thesportsdb import parse
 
 FIX = Path(__file__).parent / "fixtures"
+# Shortly after the synthetic 2026-10-13 17:00 UTC kickoffs below.
+DURING = datetime(2026, 10, 13, 18, 0, tzinfo=timezone.utc)
 
 
 def load(name, key):
@@ -33,7 +35,7 @@ def test_tsdb_live_with_null_scores():
     ev = {"strTimestamp": "2026-10-13T17:00:00", "strHomeTeam": "1860 Munich",
           "strAwayTeam": "Bayreuth", "intHomeScore": None, "intAwayScore": "",
           "strStatus": "2H", "strLeague": "German Regionalliga Bayern"}
-    m = parse([ev])[0]
+    m = parse([ev], now=DURING)[0]
     assert m.status is Status.LIVE
     assert (m.home_goals, m.away_goals) == (None, None)
 
@@ -42,7 +44,7 @@ def test_tsdb_halftime_and_cup():
     ev = {"strTimestamp": "2026-10-13T17:00:00", "strHomeTeam": "1860 Munich",
           "strAwayTeam": "Bayreuth", "intHomeScore": "1", "intAwayScore": "0",
           "strStatus": "HT", "strLeague": "DFB-Pokal"}
-    m = parse([ev])[0]
+    m = parse([ev], now=DURING)[0]
     assert (m.status, m.minute, m.competition, m.home_goals) == (Status.LIVE, "HZ", "DFB", 1)
 
 

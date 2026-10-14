@@ -22,6 +22,8 @@ def default_fetchers() -> dict[str, Fetcher]:
         "ucl": espn_today("uefa.champions", "UCL"),
         "uel": espn_today("uefa.europa", "UEL"),
         "uecl": espn_today("uefa.europa.conf", "UECL"),
+        # Upcoming VfB international matches for the "next match" line.
+        "vfb_ucl_schedule": lambda now: espn.fetch_schedule("uefa.champions", "UCL"),
         "1860": lambda now: thesportsdb.fetch(),
     }
 
@@ -40,6 +42,9 @@ class ScoreService:
         # Fast cycle: only sources with a live/imminent match currently on screen.
         return any(m in self.shown and is_hot(m, now) for m in self.cache.get(key, []))
 
+    def all_matches(self) -> list[Match]:
+        return [m for ms in self.cache.values() for m in ms]
+
     def refresh(self, now: datetime) -> list[Match]:
         for key, fetch in self.fetchers.items():
             if not self._due(key, now):
@@ -49,5 +54,5 @@ class ScoreService:
                 self.cache[key] = fetch(now)
             except Exception:  # one broken source must not hide the others
                 log.warning("source %s failed", key, exc_info=True)
-        self.shown = select([m for ms in self.cache.values() for m in ms], now)
+        self.shown = select(self.all_matches(), now)
         return self.shown

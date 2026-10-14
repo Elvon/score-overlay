@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-DEFAULTS = {"right": None, "y": 10}
+DEFAULTS = {"right": None, "y": 10, "sound": True}
 
 
 def load(path: Path) -> dict:

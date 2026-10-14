@@ -14,11 +14,11 @@ def test_load_corrupt_returns_defaults(tmp_path):
 def test_save_roundtrip(tmp_path):
     p = tmp_path / "config.json"
     save(p, {"right": 3000, "y": 20})
-    assert load(p) == {"right": 3000, "y": 20}
+    assert load(p) == {"right": 3000, "y": 20, "sound": True}
 
 
 def test_defaults_anchor_right_edge():
-    assert DEFAULTS == {"right": None, "y": 10}
+    assert DEFAULTS == {"right": None, "y": 10, "sound": True}
 
 
 def test_position_on_screen_kept():
@@ -34,3 +34,13 @@ def test_position_off_screen_rejected():
 
 def test_default_position_counts_as_on_screen():
     assert on_screen({"right": None, "y": 10}, (0, 0, 1920, 1080))
+
+
+def test_sound_defaults_on(tmp_path):
+    assert load(tmp_path / "missing.json")["sound"] is True
+
+
+def test_old_config_without_sound_gets_default(tmp_path):
+    p = tmp_path / "config.json"
+    p.write_text('{"right": 100, "y": 5}', encoding="utf-8")
+    assert load(p) == {"right": 100, "y": 5, "sound": True}
