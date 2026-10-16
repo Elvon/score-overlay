@@ -11,8 +11,8 @@ Spiele deiner Teams erscheinen 3 h vor Anpfiff und bleiben bis ca. 3 h nach Abpf
 
 - Unter der Uhr steht pro Team (VfB, VfB Frauen, 1860) das nächste Spiel, solange gerade keins angezeigt wird.
 - Fällt in einem Spiel deiner Teams ein Tor, blinkt die Zeile ~10 s (grün = eigenes Tor, rot = Gegentor),
-  optional mit Ton. Standard ist `C:\Windows\Media	ada.wav`; eine andere WAV-Datei lässt sich
-  in `config.json` unter `"sound_file"` eintragen (Backslashes doppelt, z.B. `"D:\Sounds\tor.wav"`).
+  optional mit Ton. Standard ist `C:\Windows\Media\tada.wav`; eine andere WAV-Datei lässt sich
+  in `config.json` unter `"sound_file"` eintragen (Backslashes doppelt, z.B. `"D:\\Sounds\\tor.wav"`).
   Der Ton spielt unabhängig vom Windows-Soundschema.
 - Es läuft immer nur ein Overlay; ein zweiter Start beendet sich sofort.
 
