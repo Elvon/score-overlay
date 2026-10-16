@@ -127,3 +127,15 @@ def test_order_focus_then_bundesliga_then_champions_league():
     l1860 = mk("RLB", "1860 Munich", "Bayreuth", Status.SCHEDULED, NOW + 2 * H)
     result = select([ucl, bl, l1860], NOW, leagues=frozenset({"BL", "UCL"}))
     assert result == [l1860, bl, ucl]
+
+
+def test_same_focus_match_from_two_sources_shown_once_first_wins():
+    oldb = mk("DFB", "TSV 1860 München", "FC Bayern München II", Status.LIVE, NOW - H)
+    tsdb = mk("DFB", "1860 Munich", "Bayern Munich II", Status.LIVE, NOW - H)
+    assert select([oldb, tsdb], NOW) == [oldb]
+
+
+def test_vfb_men_and_women_same_day_both_shown():
+    men = mk("BL", "VfB Stuttgart", "A", Status.LIVE, NOW - H)
+    women = mk("FBL", "VfB Stuttgart Frauen", "B", Status.LIVE, NOW - H)
+    assert select([men, women], NOW) == [men, women]

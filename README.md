@@ -15,6 +15,9 @@ Spiele deiner Teams erscheinen 3 h vor Anpfiff und bleiben bis ca. 3 h nach Abpf
   in `config.json` unter `"sound_file"` eintragen (Backslashes doppelt, z.B. `"D:\\Sounds\\tor.wav"`).
   Der Ton spielt unabhängig vom Windows-Soundschema.
 - Es läuft immer nur ein Overlay; ein zweiter Start beendet sich sofort.
+- Liefert eine Quelle keine Spielminute (Bundesliga, Frauen, 1860), wird sie aus der Anstoßzeit
+  geschätzt und mit `~` markiert (z.B. `~67'`, `HZ`, `~90+'`).
+- Schlägt der letzte Abruf einer Quelle fehl, werden ihre Spiele grau mit `?` hinter dem Stand angezeigt.
 
 ## Starten
 

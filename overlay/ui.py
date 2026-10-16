@@ -10,6 +10,7 @@ from pathlib import Path
 from overlay import config, single_instance
 from overlay.sound import play_goal_sound
 from overlay.goals import GoalTracker
+from overlay.minute import estimate_minute
 from overlay.model import Match, Status
 from overlay.selection import SLOW_INTERVAL, is_focus, next_interval, next_matches
 from overlay.service import ScoreService
@@ -19,6 +20,7 @@ FG = "#ffffff"
 COLORS = {Status.LIVE: "#4cff7a", Status.SCHEDULED: "#cccccc", Status.FINISHED: "#888888"}
 FONT = "Segoe UI"
 NEXT_FG = "#999999"
+STALE_FG = "#777777"
 FLASH = {"for": "#2ecc40", "against": "#ff4136"}
 FLASH_SECONDS = 10
 FLASH_MS = 400
@@ -43,15 +45,17 @@ def _key(m: Match) -> tuple:
     return (m.home, m.away, m.kickoff)
 
 
-def _score(m: Match) -> str:
+def format_score(m: Match, stale: bool) -> str:
     if m.home_goals is None or m.away_goals is None:
-        return "-:-"
-    return f"{m.home_goals}:{m.away_goals}"
+        score = "-:-"
+    else:
+        score = f"{m.home_goals}:{m.away_goals}"
+    return score + "?" if stale else score
 
 
-def _suffix(m: Match) -> str:
+def format_suffix(m: Match, now: datetime) -> str:
     if m.status is Status.LIVE:
-        return m.minute or "live"
+        return m.minute or estimate_minute(m.kickoff, now)
     if m.status is Status.FINISHED:
         return "Ende"
     return m.kickoff.astimezone().strftime("%H:%M")
@@ -118,11 +122,12 @@ class Overlay:
                 matches = self.service.refresh(now)
                 upcoming = next_matches(self.service.all_matches(), matches, now)
                 goals = self.goals.update(matches)
+                stale = self.service.stale_matches()
                 interval = next_interval(matches, now)
             except Exception:
                 matches, interval = None, SLOW_INTERVAL
             if matches is not None:
-                self.results.put((matches, upcoming, goals))
+                self.results.put((matches, upcoming, goals, stale))
             self.wake.wait(interval)
             self.wake.clear()
 
@@ -140,7 +145,8 @@ class Overlay:
         self.root.after(1000 - datetime.now().microsecond // 1000, self._tick)
 
     def _render(self, matches: list[Match], upcoming: list[tuple[str, Match]],
-                goals: dict[Match, str]) -> None:
+                goals: dict[Match, str], stale: set[Match]) -> None:
+        now = datetime.now(timezone.utc)
         for w in self.upcoming.winfo_children():
             w.destroy()
         for _team, m in (upcoming if self.cfg.get("preview") else []):
@@ -152,8 +158,9 @@ class Overlay:
         self.row_labels = {}
         for row, m in enumerate(matches):
             weight = "bold" if is_focus(m) else "normal"
-            color = COLORS[m.status]
-            cells = [m.competition, m.home, _score(m), m.away, _suffix(m)]
+            is_stale = m in stale
+            color = STALE_FG if is_stale else COLORS[m.status]
+            cells = [m.competition, m.home, format_score(m, is_stale), m.away, format_suffix(m, now)]
             anchors = ["w", "e", "center", "w", "e"]
             labels = []
             for col, (text, anchor) in enumerate(zip(cells, anchors)):

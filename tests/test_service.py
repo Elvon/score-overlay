@@ -70,3 +70,22 @@ def test_service_uses_selected_leagues():
     service = ScoreService({"a": lambda now: [BL, ucl]})
     service.leagues = frozenset({"UCL"})
     assert service.refresh(NOW) == [ucl]
+
+
+def test_failed_source_marks_its_matches_stale_until_next_success():
+    state = {"fail": False}
+
+    def flaky(now):
+        if state["fail"]:
+            raise OSError("down")
+        return [VFB]
+
+    service = ScoreService({"a": flaky, "b": lambda now: [BL]})
+    service.refresh(NOW)
+    assert service.stale_matches() == set()
+    state["fail"] = True
+    service.refresh(NOW + timedelta(seconds=30))
+    assert service.stale_matches() == {VFB}
+    state["fail"] = False
+    service.refresh(NOW + timedelta(seconds=60))
+    assert service.stale_matches() == set()

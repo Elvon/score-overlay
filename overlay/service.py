@@ -35,6 +35,7 @@ class ScoreService:
         self.last_fetch: dict[str, datetime] = {}
         self.shown: list[Match] = []
         self.leagues: frozenset[str] = DEFAULT_LEAGUES
+        self.failed: set[str] = set()
 
     def _due(self, key: str, now: datetime) -> bool:
         last = self.last_fetch.get(key)
@@ -42,6 +43,10 @@ class ScoreService:
             return True
         # Fast cycle: only sources with a live/imminent match currently on screen.
         return any(m in self.shown and is_hot(m, now) for m in self.cache.get(key, []))
+
+    def stale_matches(self) -> set[Match]:
+        """Cached matches of sources whose latest fetch failed."""
+        return {m for key in self.failed for m in self.cache.get(key, [])}
 
     def all_matches(self) -> list[Match]:
         return [m for ms in self.cache.values() for m in ms]
@@ -53,7 +58,9 @@ class ScoreService:
             self.last_fetch[key] = now
             try:
                 self.cache[key] = fetch(now)
+                self.failed.discard(key)
             except Exception:  # one broken source must not hide the others
+                self.failed.add(key)
                 log.warning("source %s failed", key, exc_info=True)
         self.shown = select(self.all_matches(), now, self.leagues)
         return self.shown

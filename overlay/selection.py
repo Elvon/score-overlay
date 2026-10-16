@@ -48,7 +48,10 @@ def select(matches: list[Match], now: datetime,
     seen = set()
     result = []
     for m in matches:
-        key = (m.home, m.away, m.kickoff.date())
+        # A focus team plays at most once a day; this also merges the same match
+        # reported by two sources under different names ("TSV 1860 München" / "1860 Munich").
+        day = m.kickoff.astimezone().date()
+        key = (frozenset(_teams(m)), day) if is_focus(m) else (m.home, m.away, day)
         if key in seen or not _shown(m, now, leagues):
             continue
         seen.add(key)
