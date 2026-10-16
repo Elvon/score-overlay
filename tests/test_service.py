@@ -62,3 +62,11 @@ def test_all_matches_includes_unshown_upcoming():
 def test_default_fetchers_include_vfb_schedule():
     from overlay.service import default_fetchers
     assert "vfb_ucl_schedule" in default_fetchers()
+
+
+def test_service_uses_selected_leagues():
+    ucl = Match("UCL", "Real Madrid", "FC Liverpool", None, None, Status.SCHEDULED,
+                NOW + timedelta(hours=2))
+    service = ScoreService({"a": lambda now: [BL, ucl]})
+    service.leagues = frozenset({"UCL"})
+    assert service.refresh(NOW) == [ucl]

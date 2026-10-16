@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Callable
 
 from overlay.model import Match
-from overlay.selection import SLOW_INTERVAL, is_hot, select
+from overlay.selection import DEFAULT_LEAGUES, SLOW_INTERVAL, is_hot, select
 from overlay.sources import espn, openligadb, thesportsdb
 
 Fetcher = Callable[[datetime], list[Match]]
@@ -34,6 +34,7 @@ class ScoreService:
         self.cache: dict[str, list[Match]] = {}
         self.last_fetch: dict[str, datetime] = {}
         self.shown: list[Match] = []
+        self.leagues: frozenset[str] = DEFAULT_LEAGUES
 
     def _due(self, key: str, now: datetime) -> bool:
         last = self.last_fetch.get(key)
@@ -54,5 +55,5 @@ class ScoreService:
                 self.cache[key] = fetch(now)
             except Exception:  # one broken source must not hide the others
                 log.warning("source %s failed", key, exc_info=True)
-        self.shown = select(self.all_matches(), now)
+        self.shown = select(self.all_matches(), now, self.leagues)
         return self.shown

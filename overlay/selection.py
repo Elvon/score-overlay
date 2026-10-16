@@ -11,6 +11,9 @@ SLOW_INTERVAL = 600
 
 
 TEAMS = ["VfB", "VfB Frauen", "1860"]
+# Display order of non-focus matches; unlisted competitions come last.
+COMPETITION_ORDER = {"BL": 0, "UCL": 1}
+DEFAULT_LEAGUES = frozenset({"BL"})
 
 
 def team_of(name: str) -> str | None:
@@ -30,25 +33,32 @@ def is_focus(m: Match) -> bool:
     return bool(_teams(m))
 
 
-def _shown(m: Match, now: datetime) -> bool:
-    focus = is_focus(m)
-    if m.status is Status.LIVE and (focus or m.competition == "BL"):
+def _shown(m: Match, now: datetime, leagues: frozenset[str]) -> bool:
+    if is_focus(m) and (m.status is Status.LIVE
+                        or m.kickoff - BEFORE_KICKOFF <= now <= m.kickoff + AFTER_KICKOFF):
         return True
-    if m.competition == "BL" and m.kickoff.astimezone().date() == now.astimezone().date():
-        return True
-    return focus and m.kickoff - BEFORE_KICKOFF <= now <= m.kickoff + AFTER_KICKOFF
+    if m.competition not in leagues:
+        return False
+    return m.status is Status.LIVE or m.kickoff.astimezone().date() == now.astimezone().date()
 
 
-def select(matches: list[Match], now: datetime) -> list[Match]:
+def select(matches: list[Match], now: datetime,
+           leagues: frozenset[str] = DEFAULT_LEAGUES) -> list[Match]:
+    """leagues: competitions whose non-focus matches of the day are shown."""
     seen = set()
     result = []
     for m in matches:
         key = (m.home, m.away, m.kickoff.date())
-        if key in seen or not _shown(m, now):
+        if key in seen or not _shown(m, now, leagues):
             continue
         seen.add(key)
         result.append(m)
-    return sorted(result, key=lambda m: (not is_focus(m), m.kickoff))
+    def order(m: Match) -> tuple:
+        if is_focus(m):
+            return (0, 0, m.kickoff)
+        return (1, COMPETITION_ORDER.get(m.competition, len(COMPETITION_ORDER)), m.kickoff)
+
+    return sorted(result, key=order)
 
 
 def is_hot(m: Match, now: datetime) -> bool:

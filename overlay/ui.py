@@ -64,6 +64,7 @@ class Overlay:
         if not config.on_screen(self.cfg, _virtual_desktop()):
             self.cfg = dict(config.DEFAULTS)  # monitor gone or config broken
         self.service = ScoreService()
+        self.service.leagues = config.leagues(self.cfg)
         self.goals = GoalTracker()
         self.results: queue.Queue = queue.Queue()
         self.wake = threading.Event()
@@ -78,7 +79,7 @@ class Overlay:
         self.root.configure(bg=BG)
 
         self.clock = tk.Label(self.root, font=(FONT, 20, "bold"), fg=FG, bg=BG)
-        self.clock.pack(anchor="e", padx=10, pady=(4, 0))
+        self.clock.pack(anchor="e", padx=10, pady=(4, 4))
         self.upcoming = tk.Frame(self.root, bg=BG)
         self.upcoming.pack(anchor="e", padx=10)
         self.table = tk.Frame(self.root, bg=BG)
@@ -86,8 +87,15 @@ class Overlay:
 
         self.menu = tk.Menu(self.root, tearoff=0)
         self.menu.add_command(label="Aktualisieren", command=self.wake.set)
-        self.sound = tk.BooleanVar(value=bool(self.cfg.get("sound", True)))
-        self.menu.add_checkbutton(label="Ton bei Tor", variable=self.sound, command=self._toggle_sound)
+        self.switches: dict[str, tk.BooleanVar] = {}
+        self.menu.add_separator()
+        for key, label in (("preview", "Vorschau"), ("all_bl", "Alle Bundesliga-Spiele"),
+                           ("all_ucl", "Alle Champions-League-Spiele"), ("sound", "Ton bei Tor")):
+            var = tk.BooleanVar(value=bool(self.cfg.get(key)))
+            self.switches[key] = var
+            self.menu.add_checkbutton(label=label, variable=var,
+                                      command=lambda k=key: self._toggle(k))
+        self.menu.add_separator()
         self.menu.add_command(label="Beenden", command=self.root.destroy)
 
         self.root.bind_all("<ButtonPress-1>", self._drag_start)
@@ -135,7 +143,7 @@ class Overlay:
                 goals: dict[Match, str]) -> None:
         for w in self.upcoming.winfo_children():
             w.destroy()
-        for _team, m in upcoming:
+        for _team, m in (upcoming if self.cfg.get("preview") else []):
             tk.Label(self.upcoming, text=format_next(m), font=(FONT, 9), fg=NEXT_FG, bg=BG,
                      anchor="e").pack(anchor="e")
 
@@ -158,9 +166,17 @@ class Overlay:
         until = time.monotonic() + FLASH_SECONDS
         for m, kind in goals.items():
             self.flashing[_key(m)] = (FLASH[kind], until)
-        if goals and self.sound.get():
+        if goals and self.cfg.get("sound"):
             winsound.MessageBeep(winsound.MB_ICONASTERISK)
+        self._layout()
         self._place()
+
+    def _layout(self) -> None:
+        """Hide empty sections; an empty Tk frame keeps its last size otherwise."""
+        for frame, pady in ((self.upcoming, 0), (self.table, (0, 6))):
+            frame.pack_forget()
+            if frame.winfo_children():
+                frame.pack(anchor="e", padx=10, pady=pady)
 
     def _flash_tick(self) -> None:
         self.flash_on = not self.flash_on
@@ -205,9 +221,11 @@ class Overlay:
         self.cfg["y"] = self.root.winfo_y()
         config.save(self.config_path, self.cfg)
 
-    def _toggle_sound(self) -> None:
-        self.cfg["sound"] = self.sound.get()
+    def _toggle(self, key: str) -> None:
+        self.cfg[key] = self.switches[key].get()
         config.save(self.config_path, self.cfg)
+        self.service.leagues = config.leagues(self.cfg)
+        self.wake.set()  # re-select and redraw right away
 
 
 def run(config_path: Path) -> None:

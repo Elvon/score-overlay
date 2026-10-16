@@ -2,7 +2,7 @@
 
 Kleines, immer im Vordergrund liegendes Fenster mit Uhrzeit und Fußball-Spielständen:
 
-- An Bundesliga-Spieltagen alle Spiele des Tages
+- An Bundesliga-Spieltagen alle Spiele des Tages, auf Wunsch auch an Champions-League-Abenden
 - VfB Stuttgart (Bundesliga, DFB-Pokal, Champions/Europa/Conference League)
 - VfB Stuttgart Frauen (Frauen-Bundesliga)
 - TSV 1860 München (Regionalliga Bayern, DFB-Pokal)
@@ -19,7 +19,14 @@ Spiele deiner Teams erscheinen 3 h vor Anpfiff und bleiben bis ca. 3 h nach Abpf
 Doppelklick auf `start.pyw` (benötigt Python 3.13, keine weiteren Pakete).
 
 - Linke Maustaste: Fenster verschieben (Position wird in `config.json` gespeichert)
-- Rechte Maustaste: „Aktualisieren“ / „Ton bei Tor“ (an/aus, wird gespeichert) / „Beenden“
+- Rechte Maustaste: „Aktualisieren“, Schalter (werden gespeichert), „Beenden“
+  - „Vorschau“ – nächstes Spiel pro Team unter der Uhr
+  - „Alle Bundesliga-Spiele“ – an Spieltagen auch die Spiele ohne deine Teams (Standard: an)
+  - „Alle Champions-League-Spiele“ – an CL-Abenden auch die übrigen Spiele (Standard: aus)
+  - „Ton bei Tor“
+
+Spiele vom VfB (Männer/Frauen) und von 1860 werden immer angezeigt und stehen immer oben,
+danach folgen Bundesliga- und Champions-League-Spiele nach Anstoßzeit.
 
 ### Autostart
 

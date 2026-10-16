@@ -102,3 +102,28 @@ def test_next_matches_one_line_per_team_not_shown():
 def test_next_matches_team_without_upcoming_match_omitted():
     from overlay.selection import next_matches
     assert next_matches([], shown=[], now=NOW) == []
+
+
+def test_bundesliga_day_hidden_when_switched_off():
+    other = mk("BL", "Eintracht Frankfurt", "1. FC Köln", Status.SCHEDULED, NOW + 8 * H)
+    vfb = mk("BL", "Hamburger SV", "VfB Stuttgart", Status.SCHEDULED, NOW + 2 * H)
+    assert select([other, vfb], NOW, leagues=frozenset()) == [vfb]
+
+
+def test_live_bundesliga_hidden_when_switched_off():
+    live = mk("BL", "A", "B", Status.LIVE, NOW - H)
+    assert select([live], NOW, leagues=frozenset()) == []
+
+
+def test_champions_league_day_shown_when_switched_on():
+    ucl = mk("UCL", "Real Madrid", "FC Liverpool", Status.SCHEDULED, NOW + 9 * H)
+    assert select([ucl], NOW) == []
+    assert select([ucl], NOW, leagues=frozenset({"UCL"})) == [ucl]
+
+
+def test_order_focus_then_bundesliga_then_champions_league():
+    ucl = mk("UCL", "Real Madrid", "FC Liverpool", Status.SCHEDULED, NOW + H)
+    bl = mk("BL", "A", "B", Status.SCHEDULED, NOW + 6 * H)
+    l1860 = mk("RLB", "1860 Munich", "Bayreuth", Status.SCHEDULED, NOW + 2 * H)
+    result = select([ucl, bl, l1860], NOW, leagues=frozenset({"BL", "UCL"}))
+    assert result == [l1860, bl, ucl]

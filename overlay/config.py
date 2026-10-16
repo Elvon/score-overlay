@@ -2,7 +2,8 @@
 import json
 from pathlib import Path
 
-DEFAULTS = {"right": None, "y": 10, "sound": True}
+DEFAULTS = {"right": None, "y": 10, "sound": True,
+            "preview": True, "all_bl": True, "all_ucl": False}
 
 
 def load(path: Path) -> dict:
@@ -31,3 +32,8 @@ def on_screen(cfg: dict, desktop: tuple[int, int, int, int]) -> bool:
         return False
     dx, dy, dw, dh = desktop
     return dx + MIN_VISIBLE <= right <= dx + dw and dy <= y <= dy + dh - MIN_VISIBLE
+
+
+def leagues(cfg: dict) -> frozenset[str]:
+    """Competitions whose other matches of the day are shown, per the menu switches."""
+    return frozenset(code for code, key in (("BL", "all_bl"), ("UCL", "all_ucl")) if cfg.get(key))

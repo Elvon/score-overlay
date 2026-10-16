@@ -14,11 +14,12 @@ def test_load_corrupt_returns_defaults(tmp_path):
 def test_save_roundtrip(tmp_path):
     p = tmp_path / "config.json"
     save(p, {"right": 3000, "y": 20})
-    assert load(p) == {"right": 3000, "y": 20, "sound": True}
+    assert load(p) == {**DEFAULTS, "right": 3000, "y": 20}
 
 
 def test_defaults_anchor_right_edge():
-    assert DEFAULTS == {"right": None, "y": 10, "sound": True}
+    assert DEFAULTS == {"right": None, "y": 10, "sound": True,
+                        "preview": True, "all_bl": True, "all_ucl": False}
 
 
 def test_position_on_screen_kept():
@@ -43,4 +44,15 @@ def test_sound_defaults_on(tmp_path):
 def test_old_config_without_sound_gets_default(tmp_path):
     p = tmp_path / "config.json"
     p.write_text('{"right": 100, "y": 5}', encoding="utf-8")
-    assert load(p) == {"right": 100, "y": 5, "sound": True}
+    assert load(p) == {**DEFAULTS, "right": 100, "y": 5}
+
+
+def test_display_switch_defaults(tmp_path):
+    cfg = load(tmp_path / "missing.json")
+    assert (cfg["preview"], cfg["all_bl"], cfg["all_ucl"]) == (True, True, False)
+
+
+def test_leagues_from_config():
+    from overlay.config import leagues
+    assert leagues({"all_bl": True, "all_ucl": False}) == frozenset({"BL"})
+    assert leagues({"all_bl": False, "all_ucl": True}) == frozenset({"UCL"})
