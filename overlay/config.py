@@ -3,7 +3,8 @@ import json
 from pathlib import Path
 
 DEFAULTS = {"right": None, "y": 10, "sound": True,
-            "preview": True, "all_bl": True, "all_ucl": False}
+            "preview": True, "all_bl": True, "all_ucl": False,
+            "sound_file": r"C:\Windows\Media\tada.wav"}
 
 
 def load(path: Path) -> dict:

@@ -19,7 +19,8 @@ def test_save_roundtrip(tmp_path):
 
 def test_defaults_anchor_right_edge():
     assert DEFAULTS == {"right": None, "y": 10, "sound": True,
-                        "preview": True, "all_bl": True, "all_ucl": False}
+                        "preview": True, "all_bl": True, "all_ucl": False,
+                        "sound_file": r"C:\Windows\Media\tada.wav"}
 
 
 def test_position_on_screen_kept():
@@ -56,3 +57,7 @@ def test_leagues_from_config():
     from overlay.config import leagues
     assert leagues({"all_bl": True, "all_ucl": False}) == frozenset({"BL"})
     assert leagues({"all_bl": False, "all_ucl": True}) == frozenset({"UCL"})
+
+
+def test_goal_sound_file_defaults_to_tada(tmp_path):
+    assert load(tmp_path / "missing.json")["sound_file"] == r"C:\Windows\Media\tada.wav"

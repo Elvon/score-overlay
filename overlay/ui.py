@@ -4,11 +4,11 @@ import queue
 import threading
 import time
 import tkinter as tk
-import winsound
 from datetime import datetime, timezone
 from pathlib import Path
 
 from overlay import config, single_instance
+from overlay.sound import play_goal_sound
 from overlay.goals import GoalTracker
 from overlay.model import Match, Status
 from overlay.selection import SLOW_INTERVAL, is_focus, next_interval, next_matches
@@ -167,7 +167,7 @@ class Overlay:
         for m, kind in goals.items():
             self.flashing[_key(m)] = (FLASH[kind], until)
         if goals and self.cfg.get("sound"):
-            winsound.MessageBeep(winsound.MB_ICONASTERISK)
+            play_goal_sound(self.cfg.get("sound_file"))
         self._layout()
         self._place()
 
