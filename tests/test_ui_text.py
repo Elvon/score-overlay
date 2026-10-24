@@ -32,3 +32,42 @@ def test_score_marks_stale():
     m = Match("BL", "A", "B", 2, 1, Status.LIVE, datetime(2026, 10, 17, tzinfo=timezone.utc))
     assert format_score(m, stale=False) == "2:1"
     assert format_score(m, stale=True) == "2:1?"
+
+
+def test_about_lines():
+    from overlay.ui import REPO_URL, about_lines
+    lines = about_lines("1.5.0", "Aktuell")
+    assert "Version 1.5.0" in lines
+    assert "Lizenz: GPL-3.0-or-later" in lines
+    assert REPO_URL in lines
+    assert "Update: Aktuell" in lines
+
+
+def test_status_text():
+    from overlay.ui import status_text
+    from overlay.updater import UpdateInfo
+    assert status_text(None) == "Noch nicht geprüft"
+    assert status_text(UpdateInfo(True, "1.6.0", None)) == "v1.6.0 verfügbar"
+    assert status_text(UpdateInfo(False, None, "offline")) == "Prüfung fehlgeschlagen"
+    assert status_text(UpdateInfo(False, "1.5.0", None)) == "Aktuell"
+
+
+def test_restart_releases_lock_before_spawning(monkeypatch, tmp_path):
+    from overlay import ui
+    calls = []
+
+    class FakeRoot:
+        def mainloop(self):
+            calls.append("mainloop")
+
+    class FakeOverlay:
+        def __init__(self, config_path):
+            self.root = FakeRoot()
+            self.restart_requested = True
+
+    monkeypatch.setattr(ui, "Overlay", FakeOverlay)
+    monkeypatch.setattr(ui.single_instance, "acquire", lambda name: calls.append("acquire") or 1)
+    monkeypatch.setattr(ui.single_instance, "release", lambda lock: calls.append("release"))
+    monkeypatch.setattr(ui.subprocess, "Popen", lambda args: calls.append("popen"))
+    ui.run(tmp_path / "config.json")
+    assert calls == ["acquire", "mainloop", "release", "popen"]

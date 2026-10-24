@@ -1,13 +1,18 @@
 """Borderless, always-on-top overlay window with clock and scores."""
 import ctypes
 import queue
+import subprocess
+import sys
+import tempfile
 import threading
 import time
 import tkinter as tk
+import webbrowser
+from tkinter import messagebox
 from datetime import datetime, timezone
 from pathlib import Path
 
-from overlay import config, single_instance
+from overlay import __version__, config, single_instance, updater
 from overlay.sound import play_goal_sound
 from overlay.goals import GoalTracker
 from overlay.minute import estimate_minute
@@ -28,6 +33,32 @@ TOPMOST_EVERY_MS = 5000
 POLL_MS = 500
 WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 MUTEX_NAME = "score-overlay-single-instance"
+REPO_URL = "https://codeberg.org/ElvonMF/score-overlay"
+LICENSE_NAME = "GPL-3.0-or-later"
+FIRST_UPDATE_CHECK = 60          # seconds after start
+UPDATE_CHECK_EVERY = 24 * 3600   # seconds
+
+
+def status_text(info: "updater.UpdateInfo | None") -> str:
+    if info is None:
+        return "Noch nicht geprüft"
+    if info.error:
+        return "Prüfung fehlgeschlagen"
+    if info.available:
+        return f"v{info.version} verfügbar"
+    return "Aktuell"
+
+
+def about_lines(version: str, status: str) -> list[str]:
+    return [
+        "Score-Overlay",
+        f"Version {version}",
+        f"Lizenz: {LICENSE_NAME}",
+        "Copyright (C) 2026 ElvonMF",
+        REPO_URL,
+        "Daten: OpenLigaDB, ESPN, TheSportsDB, optional goal-api.com",
+        f"Update: {status}",
+    ]
 
 
 def _virtual_desktop() -> tuple[int, int, int, int]:
@@ -64,6 +95,13 @@ def format_suffix(m: Match, now: datetime) -> str:
 class Overlay:
     def __init__(self, config_path: Path):
         self.config_path = config_path
+        self.app_dir = config_path.parent
+        self.restart_requested = False
+        self.update_info: updater.UpdateInfo | None = None
+        self.update_events: queue.Queue = queue.Queue()
+        self.check_now = threading.Event()
+        self.about_window: tk.Toplevel | None = None
+        self.about_status: tk.Label | None = None
         self.cfg = config.load(config_path)
         if not config.on_screen(self.cfg, _virtual_desktop()):
             self.cfg = dict(config.DEFAULTS)  # monitor gone or config broken
@@ -101,6 +139,8 @@ class Overlay:
             self.menu.add_checkbutton(label=label, variable=var,
                                       command=lambda k=key: self._toggle(k))
         self.menu.add_separator()
+        self.menu.add_command(label="Über Score-Overlay…", command=self._show_about)
+        self.update_entry = False  # whether the menu currently has an update entry
         self.menu.add_command(label="Beenden", command=self.root.destroy)
 
         self.root.bind_all("<ButtonPress-1>", self._drag_start)
@@ -114,6 +154,7 @@ class Overlay:
         self._poll_results()
         self._flash_tick()
         threading.Thread(target=self._worker, daemon=True).start()
+        threading.Thread(target=self._update_worker, daemon=True).start()
 
     # --- background fetching -------------------------------------------
     def _worker(self) -> None:
@@ -136,6 +177,11 @@ class Overlay:
         try:
             while True:
                 self._render(*self.results.get_nowait())
+        except queue.Empty:
+            pass
+        try:
+            while True:
+                self._handle_update_event(*self.update_events.get_nowait())
         except queue.Empty:
             pass
         self.root.after(POLL_MS, self._poll_results)
@@ -215,16 +261,109 @@ class Overlay:
         self.root.lift()
         self.root.after(TOPMOST_EVERY_MS, self._keep_on_top)
 
+    # --- updates ---------------------------------------------------------
+    def _update_worker(self) -> None:
+        self.check_now.wait(FIRST_UPDATE_CHECK)
+        while True:
+            self.check_now.clear()
+            self.update_events.put(("checked", updater.check(__version__)))
+            self.check_now.wait(UPDATE_CHECK_EVERY)
+
+    def _handle_update_event(self, kind: str, payload) -> None:
+        if kind == "checked":
+            self.update_info = payload
+            self._refresh_update_entry()
+        elif kind == "installed":
+            self.restart_requested = True
+            self.root.destroy()
+            return
+        elif kind == "failed":
+            messagebox.showerror("Update fehlgeschlagen", str(payload), parent=self.root)
+        if self.about_status is not None and self.about_status.winfo_exists():
+            self.about_status.config(text=f"Update: {status_text(self.update_info)}")
+
+    def _refresh_update_entry(self) -> None:
+        end = self.menu.index("end")  # "Beenden"
+        if self.update_entry:
+            self.menu.delete(end - 1)
+            self.update_entry = False
+            end -= 1
+        info = self.update_info
+        if not (info and info.available):
+            return
+        if updater.is_git_checkout(self.app_dir):
+            self.menu.insert_command(end, label=f"v{info.version} verfügbar – per git pull aktualisieren",
+                                     state="disabled")
+        else:
+            self.menu.insert_command(end, label=f"Update auf v{info.version} installieren",
+                                     command=self._install_update)
+        self.update_entry = True
+
+    def _install_update(self) -> None:
+        version = self.update_info.version
+        question = f"Version {version} herunterladen und installieren?\nDas Overlay startet danach neu."
+        if not messagebox.askyesno("Update", question, parent=self.root):
+            return
+
+        def work():
+            try:
+                with tempfile.TemporaryDirectory() as tmp:
+                    updater.install(updater.download(version, Path(tmp)), self.app_dir, version)
+                self.update_events.put(("installed", version))
+            except Exception as exc:
+                self.update_events.put(("failed", exc))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _show_about(self) -> None:
+        if self.about_window is not None and self.about_window.winfo_exists():
+            self.about_window.lift()
+            return
+        win = tk.Toplevel(self.root, bg=BG, padx=16, pady=12)
+        win.title("Über Score-Overlay")
+        win.attributes("-topmost", True)
+        win.resizable(False, False)
+        lines = about_lines(__version__, status_text(self.update_info))
+        for line in lines[:-1]:
+            label = tk.Label(win, text=line, font=(FONT, 10, "bold" if line == lines[0] else "normal"),
+                             fg=FG, bg=BG, anchor="w")
+            if line == REPO_URL:
+                label.config(fg="#6cb4ff", cursor="hand2")
+                label.bind("<Button-1>", lambda e: webbrowser.open(REPO_URL))
+            label.pack(anchor="w")
+        self.about_status = tk.Label(win, text=lines[-1], font=(FONT, 10), fg=FG, bg=BG, anchor="w")
+        self.about_status.pack(anchor="w", pady=(6, 10))
+        buttons = tk.Frame(win, bg=BG)
+        buttons.pack(anchor="e")
+        tk.Button(buttons, text="Nach Updates suchen", command=self._check_from_about).pack(side="left", padx=4)
+        tk.Button(buttons, text="Schließen", command=win.destroy).pack(side="left")
+        self.about_window = win
+
+    def _check_from_about(self) -> None:
+        self.about_status.config(text="Update: Wird geprüft…")
+        self.check_now.set()
+
     # --- dragging --------------------------------------------------------
+    def _on_overlay(self, event) -> bool:
+        """Mouse bindings are global; only the overlay window itself is draggable."""
+        return event.widget.winfo_toplevel() is self.root
+
     def _drag_start(self, event) -> None:
+        if not self._on_overlay(event):
+            self._offset = None
+            return
         self._offset = (event.x_root - self.root.winfo_x(), event.y_root - self.root.winfo_y())
 
     def _drag_move(self, event) -> None:
+        if getattr(self, "_offset", None) is None:
+            return
         x = event.x_root - self._offset[0]
         y = event.y_root - self._offset[1]
         self.root.geometry(f"+{x}+{y}")
 
     def _drag_end(self, event) -> None:
+        if getattr(self, "_offset", None) is None:
+            return
         self.cfg["right"] = self.root.winfo_x() + self.root.winfo_width()
         self.cfg["y"] = self.root.winfo_y()
         config.save(self.config_path, config.ui_settings(self.cfg))
@@ -241,6 +380,9 @@ def run(config_path: Path) -> None:
     if lock is None:
         return  # overlay already running
     try:
-        Overlay(config_path).root.mainloop()
+        overlay = Overlay(config_path)
+        overlay.root.mainloop()
     finally:
         single_instance.release(lock)
+    if overlay.restart_requested:  # after an update; the lock is free again
+        subprocess.Popen([sys.executable, str(config_path.parent / "start.pyw")])
