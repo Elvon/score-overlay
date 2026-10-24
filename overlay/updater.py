@@ -4,6 +4,7 @@ import logging
 import re
 import shutil
 import tempfile
+import threading
 import urllib.request
 import zipfile
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ ARCHIVE_URL = "https://codeberg.org/ElvonMF/score-overlay/archive/v{version}.zip
 PRESERVED = {"config.json", "overlay.log", ".update-backup", ".git"}
 BACKUP_DIR = ".update-backup"
 DOWNLOAD_TIMEOUT = 30
+_install_lock = threading.Lock()
 
 log = logging.getLogger(__name__)
 
@@ -108,14 +110,48 @@ def _remove(path: Path) -> None:
         path.unlink()
 
 
+def _rollback(app_dir: Path, backup: Path, started: list[str], moved: list[str]) -> list[str]:
+    """Best effort: removes partly copied entries and moves the old ones back.
+
+    Returns the names that could not be restored.
+    """
+    problems = []
+    for name in started:
+        try:
+            _remove(app_dir / name)
+        except OSError:
+            log.warning("rollback: cannot remove %s", name, exc_info=True)
+            if name in moved:
+                problems.append(name)
+    for name in moved:
+        if name in problems:
+            continue
+        try:
+            (backup / name).rename(app_dir / name)
+        except OSError:
+            log.warning("rollback: cannot restore %s", name, exc_info=True)
+            problems.append(name)
+    return problems
+
+
 def install(zip_path: Path, app_dir: Path, expected_version: str) -> None:
     """Replaces the program files in app_dir with the release in zip_path.
 
-    Old files are moved to .update-backup/ and moved back if anything fails.
+    Only names that are part of the release are replaced; anything else in app_dir (user files) is left
+    alone. Replaced entries are moved to .update-backup/ and moved back if anything fails.
     """
     if is_git_checkout(app_dir):
         raise UpdateError("Git-Ordner: bitte per git pull aktualisieren")
-    with tempfile.TemporaryDirectory() as tmp:
+    if not _install_lock.acquire(blocking=False):
+        raise UpdateError("Ein Update läuft bereits")
+    try:
+        _install(zip_path, app_dir, expected_version)
+    finally:
+        _install_lock.release()
+
+
+def _install(zip_path: Path, app_dir: Path, expected_version: str) -> None:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         extracted = Path(tmp)
         try:
             with zipfile.ZipFile(zip_path) as z:
@@ -124,21 +160,34 @@ def install(zip_path: Path, app_dir: Path, expected_version: str) -> None:
         except zipfile.BadZipFile as exc:
             raise UpdateError("Archiv ist beschädigt") from exc
         root = _release_root(extracted, expected_version)
+        names = sorted(p.name for p in root.iterdir() if p.name not in PRESERVED)
 
         backup = app_dir / BACKUP_DIR
-        _remove(backup)
-        backup.mkdir()
-        old = [p for p in app_dir.iterdir() if p.name not in PRESERVED]
-        for p in old:
-            p.rename(backup / p.name)
         try:
-            for src in root.iterdir():
-                if src.name not in PRESERVED:
-                    _copy(src, app_dir / src.name)
+            _remove(backup)
+            backup.mkdir()
+        except OSError as exc:
+            raise UpdateError(f"Kann {backup} nicht anlegen (Schreibrechte? Ordner löschen?): {exc}") from exc
+
+        moved: list[str] = []
+        started: list[str] = []
+        try:
+            for name in names:
+                if (app_dir / name).exists():
+                    (app_dir / name).rename(backup / name)
+                    moved.append(name)
+            for name in names:
+                started.append(name)
+                _copy(root / name, app_dir / name)
         except Exception as exc:
-            for p in app_dir.iterdir():
-                if p.name not in PRESERVED:
-                    _remove(p)
-            for p in backup.iterdir():
-                p.rename(app_dir / p.name)
+            problems = _rollback(app_dir, backup, started, moved)
+            if problems:
+                raise UpdateError(
+                    f"Installation fehlgeschlagen ({exc}). Nicht wiederhergestellt: {', '.join(problems)}. "
+                    f"Der alte Stand liegt in {backup} - bitte von dort zurückkopieren.") from exc
             raise UpdateError(f"Installation fehlgeschlagen, alter Stand wiederhergestellt: {exc}") from exc
+
+
+def download_and_install(version: str, app_dir: Path, opener=urllib.request.urlopen) -> None:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        install(download(version, Path(tmp), opener=opener), app_dir, version)

@@ -4,7 +4,6 @@ import ctypes
 import queue
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 import tkinter as tk
@@ -56,6 +55,7 @@ def about_lines(version: str, status: str) -> list[str]:
         f"Version {version}",
         f"Lizenz: {LICENSE_NAME}",
         "Copyright (C) 2026 ElvonMF",
+        "Ohne jede Gewährleistung – siehe LICENSE",
         REPO_URL,
         "Daten: OpenLigaDB, ESPN, TheSportsDB, optional goal-api.com",
         f"Update: {status}",
@@ -98,6 +98,7 @@ class Overlay:
         self.config_path = config_path
         self.app_dir = config_path.parent
         self.restart_requested = False
+        self.installing = False
         self.update_info: updater.UpdateInfo | None = None
         self.update_events: queue.Queue = queue.Queue()
         self.check_now = threading.Event()
@@ -279,6 +280,8 @@ class Overlay:
             self.root.destroy()
             return
         elif kind == "failed":
+            self.installing = False
+            self._refresh_update_entry()
             messagebox.showerror("Update fehlgeschlagen", str(payload), parent=self.root)
         if self.about_status is not None and self.about_status.winfo_exists():
             self.about_status.config(text=f"Update: {status_text(self.update_info)}")
@@ -292,7 +295,9 @@ class Overlay:
         info = self.update_info
         if not (info and info.available):
             return
-        if updater.is_git_checkout(self.app_dir):
+        if self.installing:
+            self.menu.insert_command(end, label=f"Update auf v{info.version} wird installiert…", state="disabled")
+        elif updater.is_git_checkout(self.app_dir):
             self.menu.insert_command(end, label=f"v{info.version} verfügbar – per git pull aktualisieren",
                                      state="disabled")
         else:
@@ -301,15 +306,18 @@ class Overlay:
         self.update_entry = True
 
     def _install_update(self) -> None:
+        if self.installing:
+            return
         version = self.update_info.version
         question = f"Version {version} herunterladen und installieren?\nDas Overlay startet danach neu."
         if not messagebox.askyesno("Update", question, parent=self.root):
             return
+        self.installing = True
+        self._refresh_update_entry()
 
         def work():
             try:
-                with tempfile.TemporaryDirectory() as tmp:
-                    updater.install(updater.download(version, Path(tmp)), self.app_dir, version)
+                updater.download_and_install(version, self.app_dir)
                 self.update_events.put(("installed", version))
             except Exception as exc:
                 self.update_events.put(("failed", exc))

@@ -79,7 +79,7 @@ def test_install_replaces_program_keeps_user_files(tmp_path):
     assert (app / "config.json").read_text() == '{"goal_api_key": "k"}'
     assert (app / "overlay.log").read_text() == "log"
     assert "1.5.0" in (app / ".update-backup" / "overlay" / "__init__.py").read_text()
-    assert not (app / "old.py").exists()
+    assert (app / "old.py").exists()  # top-level files not in the release are left alone
 
 
 @pytest.mark.parametrize("files", [
@@ -150,3 +150,90 @@ def test_download_wraps_network_error(tmp_path):
         raise OSError("offline")
     with pytest.raises(UpdateError):
         download("1.6.0", tmp_path, opener=fail)
+
+
+# --- review fixes -------------------------------------------------------------
+from pathlib import Path
+
+
+def test_install_rolls_back_when_moving_old_files_fails(tmp_path, monkeypatch):
+    app = make_app(tmp_path / "app")
+    before = snapshot(app)
+    zip_path = make_zip(tmp_path, NEW)
+    real_rename = Path.rename
+    calls = []
+
+    def flaky_rename(self, target):
+        calls.append(self.name)
+        if len(calls) == 2:
+            raise PermissionError("file in use")
+        return real_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", flaky_rename)
+    with pytest.raises(UpdateError):
+        install(zip_path, app, "1.6.0")
+    monkeypatch.undo()
+    assert {k: v for k, v in snapshot(app).items() if not k.startswith(".update-backup")} == before
+
+
+def test_rollback_continues_past_errors_and_names_backup(tmp_path, monkeypatch):
+    app = make_app(tmp_path / "app")
+    zip_path = make_zip(tmp_path, NEW)
+    real_copy, real_remove = shutil.copy2, updater._remove
+    copies = []
+
+    def flaky_copy(src, dst, *args, **kwargs):
+        copies.append(src)
+        if len(copies) > 1:
+            raise OSError("disk full")
+        return real_copy(src, dst, *args, **kwargs)
+
+    def locked_remove(path):
+        if path.name == "overlay" and ".update-backup" not in path.parts:
+            raise PermissionError("scanned by antivirus")
+        return real_remove(path)
+
+    monkeypatch.setattr(updater.shutil, "copy2", flaky_copy)
+    monkeypatch.setattr(updater, "_remove", locked_remove)
+    with pytest.raises(UpdateError, match=r"\.update-backup"):
+        install(zip_path, app, "1.6.0")
+    monkeypatch.undo()
+    assert (app / "start.pyw").read_text() == "old start"
+
+
+def test_user_files_survive_updates(tmp_path):
+    app = make_app(tmp_path / "app")
+    (app / "tor.wav").write_bytes(b"RIFF")
+    install(make_zip(tmp_path, NEW), app, "1.6.0")
+    newer = {**NEW, "overlay/__init__.py": '__version__ = "1.7.0"\n'}
+    install(make_zip(tmp_path, newer), app, "1.7.0")
+    assert (app / "tor.wav").read_bytes() == b"RIFF"
+    assert (app / "old.py").exists()  # not part of any release: left alone
+
+
+def test_only_one_install_at_a_time(tmp_path):
+    app = make_app(tmp_path / "app")
+    before = snapshot(app)
+    assert updater._install_lock.acquire(blocking=False)
+    try:
+        with pytest.raises(UpdateError, match="läuft bereits"):
+            install(make_zip(tmp_path, NEW), app, "1.6.0")
+    finally:
+        updater._install_lock.release()
+    assert snapshot(app) == before
+
+
+def test_temp_dirs_ignore_cleanup_errors(tmp_path, monkeypatch):
+    seen = []
+    real = updater.tempfile.TemporaryDirectory
+
+    def recording(*args, **kwargs):
+        seen.append(kwargs.get("ignore_cleanup_errors"))
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(updater.tempfile, "TemporaryDirectory", recording)
+    app = make_app(tmp_path / "app")
+    payload = make_zip(tmp_path, NEW).read_bytes()
+    updater.download_and_install("1.6.0", app, opener=lambda url, timeout=None: FakeResponse(payload))
+    assert seen and all(seen)
+    assert "1.6.0" in (app / "overlay" / "__init__.py").read_text()

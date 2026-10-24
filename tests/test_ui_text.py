@@ -72,3 +72,24 @@ def test_restart_releases_lock_before_spawning(monkeypatch, tmp_path):
     monkeypatch.setattr(ui.subprocess, "Popen", lambda args: calls.append("popen"))
     ui.run(tmp_path / "config.json")
     assert calls == ["acquire", "mainloop", "release", "popen"]
+
+
+def test_about_mentions_no_warranty():
+    from overlay.ui import about_lines
+    assert "Ohne jede Gewährleistung – siehe LICENSE" in about_lines("1.5.0", "Aktuell")
+
+
+def test_install_click_ignored_while_installing(monkeypatch):
+    from overlay import ui
+    from overlay.updater import UpdateInfo
+    asked, started = [], []
+    monkeypatch.setattr(ui.messagebox, "askyesno", lambda *a, **k: asked.append(1) or True)
+    monkeypatch.setattr(ui.threading, "Thread", lambda target, daemon: type("T", (), {"start": lambda self: started.append(1)})())
+    o = ui.Overlay.__new__(ui.Overlay)
+    o.root = None
+    o.update_info = UpdateInfo(True, "1.6.0", None)
+    o.installing = False
+    o._refresh_update_entry = lambda: None
+    o._install_update()
+    o._install_update()
+    assert (len(asked), len(started), o.installing) == (1, 1, True)
