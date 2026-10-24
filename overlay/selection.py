@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Decides which matches the overlay shows and how often to refresh."""
 from datetime import datetime, timedelta
 

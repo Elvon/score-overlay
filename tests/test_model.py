@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 from datetime import date, datetime, timezone
 
 from overlay.model import Match, Status, season_for

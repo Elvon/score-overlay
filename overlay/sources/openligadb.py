@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """OpenLigaDB: Bundesliga (bl1), DFB-Pokal (dfb), Frauen-Bundesliga (ffb1)."""
 from datetime import datetime
 

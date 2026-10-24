@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Prevents a second overlay via a named Windows mutex."""
 import ctypes
 

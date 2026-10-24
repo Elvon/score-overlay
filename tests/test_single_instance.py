@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 from overlay.single_instance import acquire, release
 
 NAME = "score-overlay-test-mutex"

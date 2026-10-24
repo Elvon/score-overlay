@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Goal sound: plays a WAV file itself, independent of the Windows sound scheme."""
 import winsound
 from pathlib import Path

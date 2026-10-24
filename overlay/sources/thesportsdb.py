@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """TheSportsDB (free key "123"): TSV 1860 München, Regionalliga Bayern."""
 from datetime import datetime, timezone
 

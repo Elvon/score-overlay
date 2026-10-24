@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """goal-api.com (needs a free API key): reliable live scores for today's matches."""
 from datetime import date, datetime
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Version strings like "1.5.0" or "v1.5.0"."""
 import re
 

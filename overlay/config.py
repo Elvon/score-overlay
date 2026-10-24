@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Persists the window position in a small JSON file."""
 import json
 from pathlib import Path

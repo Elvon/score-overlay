@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import Enum

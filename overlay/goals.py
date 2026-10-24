@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Detects new goals in focus-team matches between two refreshes."""
 from overlay.model import Match
 from overlay.selection import team_of

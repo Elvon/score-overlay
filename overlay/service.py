@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Fetches all sources, isolating failures and caching the last good result."""
 import logging
 from datetime import datetime, timedelta

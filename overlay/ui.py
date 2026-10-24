@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Borderless, always-on-top overlay window with clock and scores."""
 import ctypes
 import queue

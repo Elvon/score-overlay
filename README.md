@@ -19,12 +19,17 @@ Spiele deiner Teams erscheinen 3 h vor Anpfiff und bleiben bis ca. 3 h nach Abpf
   geschätzt und mit `~` markiert (z.B. `~67'`, `HZ`, `~90+'`).
 - Schlägt der letzte Abruf einer Quelle fehl, werden ihre Spiele grau mit `?` hinter dem Stand angezeigt.
 
-## Starten
+## Installation
 
-Doppelklick auf `start.pyw` (benötigt Python 3.13, keine weiteren Pakete).
+1. [Python 3.13](https://www.python.org/downloads/) installieren (keine weiteren Pakete nötig).
+2. Auf der [Release-Seite](https://codeberg.org/ElvonMF/score-overlay/releases) das ZIP der neuesten Version
+   herunterladen und in einen Ordner entpacken, z.B. `%LOCALAPPDATA%\score-overlay`.
+3. `start.pyw` doppelklicken.
+
+## Bedienung
 
 - Linke Maustaste: Fenster verschieben (Position wird in `config.json` gespeichert)
-- Rechte Maustaste: „Aktualisieren“, Schalter (werden gespeichert), „Beenden“
+- Rechte Maustaste: „Aktualisieren“, Schalter (werden gespeichert), „Über Score-Overlay…“, „Beenden“
   - „Vorschau“ – nächstes Spiel pro Team unter der Uhr
   - „Alle Bundesliga-Spiele“ – an Spieltagen auch die Spiele ohne deine Teams (Standard: an)
   - „Alle Champions-League-Spiele“ – an CL-Abenden auch die übrigen Spiele (Standard: aus)
@@ -32,6 +37,14 @@ Doppelklick auf `start.pyw` (benötigt Python 3.13, keine weiteren Pakete).
 
 Spiele vom VfB (Männer/Frauen) und von 1860 werden immer angezeigt und stehen immer oben,
 danach folgen Bundesliga- und Champions-League-Spiele nach Anstoßzeit.
+
+## Updates
+
+Das Overlay sucht eine Minute nach dem Start und danach täglich nach einer neuen Version (oder per
+„Über Score-Overlay…“ → „Nach Updates suchen“). Gibt es eine, erscheint im Rechtsklick-Menü
+„Update auf vX.Y.Z installieren“: Download von Codeberg, Installation, Neustart. `config.json` und `overlay.log`
+bleiben erhalten; die vorherige Version liegt in `.update-backup/`. Läuft das Overlay aus einem Git-Klon,
+wird nur auf das Update hingewiesen (`git pull`).
 
 ### Autostart
 
@@ -63,9 +76,30 @@ Fällt goal-api.com länger als 5 Minuten aus (oder ist das Tageslimit erreicht)
 Bekannte Lücken: DFB-Pokal/Champions League der Frauen, Toto-Pokal. Live-Stände von 1860 können verzögert sein.
 Fehler beim Abruf werden in `overlay.log` protokolliert.
 
+## Hinweis zu Datenquellen
+
+Die Lizenz unten gilt nur für den Code dieses Programms. Die angezeigten Daten gehören den jeweiligen Anbietern
+(OpenLigaDB, ESPN, TheSportsDB, goal-api.com); es gelten deren Nutzungsbedingungen. Die ESPN-Schnittstelle ist
+inoffiziell und nicht für Dritte dokumentiert. Die Nutzung erfolgt auf eigene Verantwortung.
+
 ## Entwicklung
 
 ```
 py -m pip install --user pytest
 py -m pytest -q
 ```
+
+Neue Version veröffentlichen:
+
+1. `__version__` in `overlay/__init__.py` erhöhen, committen.
+2. Tag `vX.Y.Z` anlegen und pushen.
+3. Auf Codeberg unter „Releases“ ein Release zu diesem Tag anlegen (nur Releases werden als Update angeboten).
+
+## Lizenz
+
+Copyright (C) 2026 ElvonMF
+
+Dieses Programm ist freie Software: Sie können es unter den Bedingungen der GNU General Public License,
+wie von der Free Software Foundation veröffentlicht, weitergeben und/oder modifizieren, entweder gemäß
+Version 3 der Lizenz oder (nach Ihrer Wahl) jeder späteren Version (GPL-3.0-or-later).
+Es wird ohne jede Gewährleistung bereitgestellt. Details in [LICENSE](LICENSE).

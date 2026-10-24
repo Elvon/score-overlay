@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Start the score overlay without a console window (double-click or pythonw)."""
 import logging
 import sys

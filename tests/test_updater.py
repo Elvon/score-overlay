@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 from overlay.updater import UpdateInfo, check, is_git_checkout, parse_latest
 
 

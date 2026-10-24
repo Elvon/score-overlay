@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Estimates the match minute for sources that do not report one."""
 from datetime import datetime
 
