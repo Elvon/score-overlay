@@ -13,7 +13,7 @@ from overlay.goals import GoalTracker
 from overlay.minute import estimate_minute
 from overlay.model import Match, Status
 from overlay.selection import SLOW_INTERVAL, is_focus, next_interval, next_matches
-from overlay.service import ScoreService
+from overlay.service import ScoreService, goal_api_live_fetch
 
 BG = "#111111"
 FG = "#ffffff"
@@ -67,7 +67,8 @@ class Overlay:
         self.cfg = config.load(config_path)
         if not config.on_screen(self.cfg, _virtual_desktop()):
             self.cfg = dict(config.DEFAULTS)  # monitor gone or config broken
-        self.service = ScoreService()
+        key = self.cfg.get("goal_api_key")
+        self.service = ScoreService(live_fetch=goal_api_live_fetch(key) if key else None)
         self.service.leagues = config.leagues(self.cfg)
         self.goals = GoalTracker()
         self.results: queue.Queue = queue.Queue()
@@ -226,11 +227,11 @@ class Overlay:
     def _drag_end(self, event) -> None:
         self.cfg["right"] = self.root.winfo_x() + self.root.winfo_width()
         self.cfg["y"] = self.root.winfo_y()
-        config.save(self.config_path, self.cfg)
+        config.save(self.config_path, config.ui_settings(self.cfg))
 
     def _toggle(self, key: str) -> None:
         self.cfg[key] = self.switches[key].get()
-        config.save(self.config_path, self.cfg)
+        config.save(self.config_path, config.ui_settings(self.cfg))
         self.service.leagues = config.leagues(self.cfg)
         self.wake.set()  # re-select and redraw right away
 

@@ -43,7 +43,22 @@ danach folgen Bundesliga- und Champions-League-Spiele nach Anstoßzeit.
 |---|---|
 | [OpenLigaDB](https://www.openligadb.de) | Bundesliga, DFB-Pokal, Frauen-Bundesliga |
 | ESPN (inoffizielle Scoreboard-API) | Champions League, Europa League, Conference League, VfB-Spielplan Champions League |
-| [TheSportsDB](https://www.thesportsdb.com) (Free-Key) | TSV 1860 München |
+| [TheSportsDB](https://www.thesportsdb.com) (Free-Key „123“) | TSV 1860 München |
+| [goal-api.com](https://goal-api.com) (optional, eigener Key) | Live-Stände des Tages: Bundesliga, DFB-Pokal, Frauen-Bundesliga, Regionalliga |
+
+### Optional: goal-api.com für zuverlässige Live-Stände
+
+OpenLigaDB wird von Freiwilligen gepflegt; Live-Stände fehlen dort manchmal. Mit einem kostenlosen Key von
+[goal-api.com](https://goal-api.com) (1.000 Abfragen/Tag) kommen die heutigen Spiele von Bundesliga, DFB-Pokal,
+Frauen-Bundesliga und Regionalliga (1860) mit echter Spielminute von dort. In `config.json` eintragen:
+
+```json
+"goal_api_key": "DEIN_KEY"
+```
+
+Abgefragt wird nur, wenn ein Wettbewerb heute spielt: jede Minute, solange ein Spiel läuft, sonst alle 30 Minuten.
+Fällt goal-api.com länger als 5 Minuten aus (oder ist das Tageslimit erreicht), springen die anderen Quellen ein.
+`config.json` ist nicht im Repository; das Overlay ändert beim Speichern nur seine eigenen Einträge.
 
 Bekannte Lücken: DFB-Pokal/Champions League der Frauen, Toto-Pokal. Live-Stände von 1860 können verzögert sein.
 Fehler beim Abruf werden in `overlay.log` protokolliert.

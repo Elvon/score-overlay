@@ -66,3 +66,11 @@ def test_tsdb_postponed_dropped():
 def test_tsdb_live_status_long_after_kickoff_is_finished():
     m = parse([_ev("2H", ts="2026-10-01T17:00:00")], now=datetime(2026, 10, 11, tzinfo=timezone.utc))[0]
     assert m.status is Status.FINISHED
+
+
+def test_fetch_uses_current_free_key(monkeypatch):
+    from overlay.sources import thesportsdb
+    urls = []
+    monkeypatch.setattr(thesportsdb, "get_json", lambda url: urls.append(url) or {})
+    thesportsdb.fetch()
+    assert urls and all("/api/v1/json/123/" in u for u in urls)

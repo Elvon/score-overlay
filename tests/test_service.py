@@ -89,3 +89,84 @@ def test_failed_source_marks_its_matches_stale_until_next_success():
     state["fail"] = False
     service.refresh(NOW + timedelta(seconds=60))
     assert service.stale_matches() == set()
+
+
+# --- goal-api as live source -------------------------------------------------
+OLDB_TODAY = Match("BL", "1. FC Köln", "FC Schalke 04", 0, 0, Status.LIVE, NOW - timedelta(minutes=30))
+OLDB_NEXT_WEEK = Match("BL", "Hamburger SV", "VfB Stuttgart", None, None, Status.SCHEDULED,
+                       NOW + timedelta(days=7))
+GA_TODAY = Match("BL", "Köln", "Schalke 04", 0, 1, Status.LIVE, NOW - timedelta(minutes=30), "30'")
+
+
+class LiveSource:
+    def __init__(self, result):
+        self.result = result
+        self.calls = []
+
+    def __call__(self, competition, now):
+        self.calls.append((competition, now))
+        if isinstance(self.result, Exception):
+            raise self.result
+        return self.result
+
+
+def test_live_source_replaces_todays_matches_but_keeps_preview():
+    live = LiveSource([GA_TODAY])
+    service = ScoreService({"bl1": lambda now: [OLDB_TODAY, OLDB_NEXT_WEEK]}, live_fetch=live)
+    assert service.refresh(NOW) == [GA_TODAY]
+    assert OLDB_NEXT_WEEK in service.all_matches()
+    assert OLDB_TODAY not in service.all_matches()
+
+
+def test_live_source_only_asked_for_competitions_playing_today():
+    women = Match("FBL", "VfB Stuttgart Frauen", "SGS Essen Frauen", None, None, Status.SCHEDULED,
+                  NOW + timedelta(hours=2))
+    live = LiveSource([])
+    ScoreService({"x": lambda now: [women, OLDB_NEXT_WEEK]}, live_fetch=live).refresh(NOW)
+    assert [c for c, _ in live.calls] == ["FBL"]
+
+
+def test_live_source_every_minute_while_live():
+    live = LiveSource([GA_TODAY])
+    service = ScoreService({"bl1": lambda now: [OLDB_TODAY]}, live_fetch=live)
+    for seconds in (0, 30, 60):
+        service.refresh(NOW + timedelta(seconds=seconds))
+    assert len(live.calls) == 2
+
+
+def test_live_source_every_30_minutes_when_nothing_live():
+    later = Match("BL", "A", "B", None, None, Status.SCHEDULED, NOW + timedelta(hours=5))
+    live = LiveSource([later])
+    service = ScoreService({"bl1": lambda now: [later]}, live_fetch=live)
+    for minutes in (0, 10, 29, 30):
+        service.refresh(NOW + timedelta(minutes=minutes))
+    assert len(live.calls) == 2
+
+
+def test_live_source_failure_marks_stale_then_falls_back():
+    live = LiveSource([GA_TODAY])
+    service = ScoreService({"bl1": lambda now: [OLDB_TODAY]}, live_fetch=live)
+    service.refresh(NOW)
+    live.result = OSError("429 limit reached")
+    assert service.refresh(NOW + timedelta(minutes=1)) == [GA_TODAY]
+    assert GA_TODAY in service.stale_matches()
+    assert service.refresh(NOW + timedelta(minutes=7)) == [OLDB_TODAY]
+
+
+def test_live_source_stops_after_the_matchday():
+    finished = Match("BL", "Köln", "Schalke 04", 1, 1, Status.FINISHED, NOW - timedelta(hours=2))
+    live = LiveSource([finished])
+    service = ScoreService({"bl1": lambda now: [OLDB_NEXT_WEEK]}, live_fetch=live)
+    service.live["BL"] = [finished]  # state left over from the matchday
+    service.refresh(NOW + timedelta(days=1))
+    service.refresh(NOW + timedelta(days=1, hours=1))
+    assert live.calls == []
+
+
+def test_goal_api_live_fetch_uses_local_date_and_key(monkeypatch):
+    from overlay import service as svc
+    seen = {}
+    monkeypatch.setattr(svc.goalapi, "fetch",
+                        lambda comp, day, key: seen.update(comp=comp, day=day, key=key) or [])
+    svc.goal_api_live_fetch("k")("FBL", NOW)
+    assert seen == {"comp": "FBL", "day": NOW.astimezone().date(), "key": "k"}

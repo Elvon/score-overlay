@@ -17,8 +17,10 @@ def load(path: Path) -> dict:
     return {**DEFAULTS, **data}
 
 
-def save(path: Path, data: dict) -> None:
-    path.write_text(json.dumps(data), encoding="utf-8")
+def save(path: Path, updates: dict) -> None:
+    """Merges updates into the file, keeping entries edited by hand (e.g. an API key)."""
+    current = load(path)
+    path.write_text(json.dumps({**current, **updates}, indent=2), encoding="utf-8")
 
 
 MIN_VISIBLE = 50
@@ -38,3 +40,11 @@ def on_screen(cfg: dict, desktop: tuple[int, int, int, int]) -> bool:
 def leagues(cfg: dict) -> frozenset[str]:
     """Competitions whose other matches of the day are shown, per the menu switches."""
     return frozenset(code for code, key in (("BL", "all_bl"), ("UCL", "all_ucl")) if cfg.get(key))
+
+
+UI_KEYS = ("right", "y", "sound", "preview", "all_bl", "all_ucl")
+
+
+def ui_settings(cfg: dict) -> dict:
+    """The entries the overlay itself changes; everything else is left to the user."""
+    return {k: cfg[k] for k in UI_KEYS if k in cfg}

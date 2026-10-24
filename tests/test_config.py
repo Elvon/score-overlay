@@ -61,3 +61,18 @@ def test_leagues_from_config():
 
 def test_goal_sound_file_defaults_to_tada(tmp_path):
     assert load(tmp_path / "missing.json")["sound_file"] == r"C:\Windows\Media\tada.wav"
+
+
+def test_save_keeps_entries_it_does_not_manage(tmp_path):
+    p = tmp_path / "config.json"
+    p.write_text('{"goal_api_key": "secret", "right": 1, "y": 2}', encoding="utf-8")
+    save(p, {"right": 50, "y": 60})
+    assert load(p)["goal_api_key"] == "secret"
+    assert (load(p)["right"], load(p)["y"]) == (50, 60)
+
+
+def test_ui_settings_only_contains_overlay_entries():
+    from overlay.config import ui_settings
+    cfg = {**DEFAULTS, "goal_api_key": "secret", "right": 5}
+    assert "goal_api_key" not in ui_settings(cfg)
+    assert ui_settings(cfg)["right"] == 5

@@ -1,10 +1,10 @@
-"""TheSportsDB (free key "3"): TSV 1860 München, Regionalliga Bayern."""
+"""TheSportsDB (free key "123"): TSV 1860 München, Regionalliga Bayern."""
 from datetime import datetime, timezone
 
 from overlay.model import LIVE_MAX, Match, Status
 from overlay.sources.http import get_json
 
-BASE = "https://www.thesportsdb.com/api/v1/json/3"
+BASE = "https://www.thesportsdb.com/api/v1/json/123"  # free key; "3" was retired in Oct 2026
 TEAM_1860 = 134242
 
 FINISHED = {"FT", "AET", "PEN", "AP", "Match Finished"}
