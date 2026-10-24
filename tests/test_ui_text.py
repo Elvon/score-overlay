@@ -69,7 +69,7 @@ def test_restart_releases_lock_before_spawning(monkeypatch, tmp_path):
     monkeypatch.setattr(ui, "Overlay", FakeOverlay)
     monkeypatch.setattr(ui.single_instance, "acquire", lambda name: calls.append("acquire") or 1)
     monkeypatch.setattr(ui.single_instance, "release", lambda lock: calls.append("release"))
-    monkeypatch.setattr(ui.subprocess, "Popen", lambda args: calls.append("popen"))
+    monkeypatch.setattr(ui.subprocess, "Popen", lambda args, **kw: calls.append("popen"))
     ui.run(tmp_path / "config.json")
     assert calls == ["acquire", "mainloop", "release", "popen"]
 
@@ -93,3 +93,22 @@ def test_install_click_ignored_while_installing(monkeypatch):
     o._install_update()
     o._install_update()
     assert (len(asked), len(started), o.installing) == (1, 1, True)
+
+
+def test_status_text_known_update_after_failed_check():
+    from overlay.ui import status_text
+    from overlay.updater import UpdateInfo
+    assert status_text(UpdateInfo(True, "1.6.0", "offline")) == "v1.6.0 verfügbar (letzte Prüfung fehlgeschlagen)"
+
+
+def test_restart_command_prefers_pythonw_and_detaches(tmp_path):
+    import subprocess
+    from overlay.ui import restart_command
+    (tmp_path / "python.exe").write_text("")
+    start = tmp_path / "app" / "start.pyw"
+    args, kwargs = restart_command(str(tmp_path / "python.exe"), start)
+    assert args == [str(tmp_path / "python.exe"), str(start)]
+    assert kwargs == {"creationflags": subprocess.DETACHED_PROCESS}
+    (tmp_path / "pythonw.exe").write_text("")
+    args, _ = restart_command(str(tmp_path / "python.exe"), start)
+    assert args[0] == str(tmp_path / "pythonw.exe")

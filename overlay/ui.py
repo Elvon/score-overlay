@@ -42,11 +42,21 @@ UPDATE_CHECK_EVERY = 24 * 3600   # seconds
 def status_text(info: "updater.UpdateInfo | None") -> str:
     if info is None:
         return "Noch nicht geprüft"
+    if info.available:
+        suffix = " (letzte Prüfung fehlgeschlagen)" if info.error else ""
+        return f"v{info.version} verfügbar{suffix}"
     if info.error:
         return "Prüfung fehlgeschlagen"
-    if info.available:
-        return f"v{info.version} verfügbar"
     return "Aktuell"
+
+
+def restart_command(executable: str, start: Path) -> tuple[list[str], dict]:
+    """Restarts with pythonw.exe if available, never attached to a console."""
+    exe = Path(executable)
+    windowless = exe.with_name("pythonw.exe")
+    if exe.name.lower() == "python.exe" and windowless.exists():
+        exe = windowless
+    return [str(exe), str(start)], {"creationflags": subprocess.DETACHED_PROCESS}
 
 
 def about_lines(version: str, status: str) -> list[str]:
@@ -273,7 +283,7 @@ class Overlay:
 
     def _handle_update_event(self, kind: str, payload) -> None:
         if kind == "checked":
-            self.update_info = payload
+            self.update_info = updater.merge_info(self.update_info, payload)
             self._refresh_update_entry()
         elif kind == "installed":
             self.restart_requested = True
@@ -394,4 +404,5 @@ def run(config_path: Path) -> None:
     finally:
         single_instance.release(lock)
     if overlay.restart_requested:  # after an update; the lock is free again
-        subprocess.Popen([sys.executable, str(config_path.parent / "start.pyw")])
+        args, kwargs = restart_command(sys.executable, config_path.parent / "start.pyw")
+        subprocess.Popen(args, **kwargs)

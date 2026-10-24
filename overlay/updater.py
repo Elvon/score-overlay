@@ -9,6 +9,7 @@ import urllib.request
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from urllib.parse import urlsplit
 
 from overlay.sources.http import get_json
 from overlay.version import is_newer, parse_version
@@ -20,6 +21,7 @@ ARCHIVE_URL = "https://codeberg.org/ElvonMF/score-overlay/archive/v{version}.zip
 PRESERVED = {"config.json", "overlay.log", ".update-backup", ".git"}
 BACKUP_DIR = ".update-backup"
 DOWNLOAD_TIMEOUT = 30
+ALLOWED_HOST = "codeberg.org"
 _install_lock = threading.Lock()
 
 log = logging.getLogger(__name__)
@@ -56,6 +58,19 @@ def check(current: str, fetch=get_json) -> UpdateInfo:
     return UpdateInfo(is_newer(latest, current), latest, None)
 
 
+def merge_info(previous: UpdateInfo | None, new: UpdateInfo) -> UpdateInfo:
+    """Keeps an already found update when a later check fails (e.g. offline)."""
+    if new.error and previous is not None and previous.available:
+        return UpdateInfo(True, previous.version, new.error)
+    return new
+
+
+def _trusted(url: str) -> bool:
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower()
+    return parts.scheme == "https" and (host == ALLOWED_HOST or host.endswith("." + ALLOWED_HOST))
+
+
 def is_git_checkout(app_dir: Path) -> bool:
     return (app_dir / ".git").exists()
 
@@ -65,7 +80,12 @@ def download(version: str, dest: Path, opener=urllib.request.urlopen) -> Path:
     path = dest / f"score-overlay-{version}.zip"
     try:
         with opener(ARCHIVE_URL.format(version=version), timeout=DOWNLOAD_TIMEOUT) as resp:
+            final_url = resp.geturl()
+            if not _trusted(final_url):
+                raise UpdateError(f"Download wurde auf eine unerwartete Adresse umgeleitet: {final_url}")
             path.write_bytes(resp.read())
+    except UpdateError:
+        raise
     except Exception as exc:
         raise UpdateError(f"Download fehlgeschlagen: {exc}") from exc
     if not zipfile.is_zipfile(path):

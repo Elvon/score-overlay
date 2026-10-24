@@ -125,6 +125,13 @@ def test_install_rolls_back_on_copy_error(tmp_path, monkeypatch):
 
 
 class FakeResponse(io.BytesIO):
+    def __init__(self, data, url=None):
+        super().__init__(data)
+        self.url = url or ARCHIVE_URL.format(version="1.6.0")
+
+    def geturl(self):
+        return self.url
+
     def __enter__(self):
         return self
 
@@ -237,3 +244,26 @@ def test_temp_dirs_ignore_cleanup_errors(tmp_path, monkeypatch):
     updater.download_and_install("1.6.0", app, opener=lambda url, timeout=None: FakeResponse(payload))
     assert seen and all(seen)
     assert "1.6.0" in (app / "overlay" / "__init__.py").read_text()
+
+
+def test_download_rejects_redirect_away_from_codeberg(tmp_path):
+    payload = make_zip(tmp_path, NEW).read_bytes()
+    for url in ("http://codeberg.org/x.zip", "https://evil.example/x.zip", "https://codeberg.org.evil.example/x.zip"):
+        with pytest.raises(UpdateError):
+            download("1.6.0", tmp_path, opener=lambda u, timeout=None: FakeResponse(payload, url))
+
+
+def test_download_allows_codeberg_subdomain(tmp_path):
+    payload = make_zip(tmp_path, NEW).read_bytes()
+    path = download("1.6.0", tmp_path,
+                    opener=lambda u, timeout=None: FakeResponse(payload, "https://cdn.codeberg.org/x.zip"))
+    assert zipfile.is_zipfile(path)
+
+
+def test_merge_info_keeps_known_update_when_check_fails():
+    from overlay.updater import UpdateInfo, merge_info
+    known = UpdateInfo(True, "1.6.0", None)
+    failed = UpdateInfo(False, None, "offline")
+    assert merge_info(known, failed) == UpdateInfo(True, "1.6.0", "offline")
+    assert merge_info(None, failed) == failed
+    assert merge_info(known, UpdateInfo(False, "1.6.0", None)) == UpdateInfo(False, "1.6.0", None)
