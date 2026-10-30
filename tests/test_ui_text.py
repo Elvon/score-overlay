@@ -112,3 +112,24 @@ def test_restart_command_prefers_pythonw_and_detaches(tmp_path):
     (tmp_path / "pythonw.exe").write_text("")
     args, _ = restart_command(str(tmp_path / "python.exe"), start)
     assert args[0] == str(tmp_path / "pythonw.exe")
+
+
+def test_suffix_marks_scheduled_match_without_update_after_kickoff():
+    from datetime import timedelta
+    from overlay.ui import format_suffix, is_overdue
+    kickoff = datetime(2026, 10, 30, 17, 0, tzinfo=timezone.utc)
+    m = Match("DFBF", "Stuttgart Frauen", "SGS Essen Frauen", None, None, Status.SCHEDULED, kickoff)
+    time = kickoff.astimezone().strftime("%H:%M")
+    assert not is_overdue(m, kickoff + timedelta(minutes=10))
+    assert format_suffix(m, kickoff + timedelta(minutes=10)) == time
+    assert is_overdue(m, kickoff + timedelta(minutes=11))
+    assert format_suffix(m, kickoff + timedelta(minutes=11)) == time + "?"
+
+
+def test_live_and_finished_matches_are_never_overdue():
+    from datetime import timedelta
+    from overlay.ui import is_overdue
+    kickoff = datetime(2026, 10, 30, 17, 0, tzinfo=timezone.utc)
+    later = kickoff + timedelta(hours=1)
+    assert not is_overdue(Match("BL", "A", "B", 0, 0, Status.LIVE, kickoff), later)
+    assert not is_overdue(Match("BL", "A", "B", 0, 0, Status.FINISHED, kickoff), later)

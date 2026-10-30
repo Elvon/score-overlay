@@ -9,7 +9,7 @@ import time
 import tkinter as tk
 import webbrowser
 from tkinter import messagebox
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from overlay import __version__, config, single_instance, updater
@@ -26,6 +26,7 @@ COLORS = {Status.LIVE: "#4cff7a", Status.SCHEDULED: "#cccccc", Status.FINISHED: 
 FONT = "Segoe UI"
 NEXT_FG = "#999999"
 STALE_FG = "#777777"
+OVERDUE_AFTER = timedelta(minutes=10)  # still "scheduled" this long after kickoff: source has no live data
 FLASH = {"for": "#2ecc40", "against": "#ff4136"}
 FLASH_SECONDS = 10
 FLASH_MS = 400
@@ -95,12 +96,17 @@ def format_score(m: Match, stale: bool) -> str:
     return score + "?" if stale else score
 
 
+def is_overdue(m: Match, now: datetime) -> bool:
+    return m.status is Status.SCHEDULED and now > m.kickoff + OVERDUE_AFTER
+
+
 def format_suffix(m: Match, now: datetime) -> str:
     if m.status is Status.LIVE:
         return m.minute or estimate_minute(m.kickoff, now)
     if m.status is Status.FINISHED:
         return "Ende"
-    return m.kickoff.astimezone().strftime("%H:%M")
+    time = m.kickoff.astimezone().strftime("%H:%M")
+    return time + "?" if is_overdue(m, now) else time
 
 
 class Overlay:
@@ -219,7 +225,7 @@ class Overlay:
         for row, m in enumerate(matches):
             weight = "bold" if is_focus(m) else "normal"
             is_stale = m in stale
-            color = STALE_FG if is_stale else COLORS[m.status]
+            color = STALE_FG if is_stale or is_overdue(m, now) else COLORS[m.status]
             cells = [m.competition, m.home, format_score(m, is_stale), m.away, format_suffix(m, now)]
             anchors = ["w", "e", "center", "w", "e"]
             labels = []

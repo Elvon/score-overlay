@@ -18,6 +18,8 @@ Spiele deiner Teams erscheinen 3 h vor Anpfiff und bleiben bis ca. 3 h nach Abpf
 - Liefert eine Quelle keine Spielminute (Bundesliga, Frauen, 1860), wird sie aus der Anstoßzeit
   geschätzt und mit `~` markiert (z.B. `~67'`, `HZ`, `~90+'`).
 - Schlägt der letzte Abruf einer Quelle fehl, werden ihre Spiele grau mit `?` hinter dem Stand angezeigt.
+- Meldet die Quelle ein Spiel 10 Minuten nach Anpfiff noch nicht als gestartet, wird es grau mit `?` hinter
+  der Anstoßzeit angezeigt (z.B. `18:00?`): Für dieses Spiel gibt es dort keine Live-Daten.
 
 ## Installation
 
