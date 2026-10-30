@@ -54,3 +54,23 @@ def test_falls_back_to_flat_team_name():
     f = _fixture("FIRST_HALF", "10")
     del f["homeTeam"]
     assert parse([f], "RLB")[0].home == "Munich 1860"
+
+
+def test_competition_of_league_names():
+    from overlay.sources.goalapi import competition_of
+    assert competition_of("DFB Pokal Women - 1/8-finals") == "DFBF"
+    assert competition_of("DFB Pokal - 2nd round") == "DFB"
+    assert competition_of("Frauen Bundesliga") == "FBL"
+    assert competition_of("Bundesliga") == "BL"
+    assert competition_of("Regionalliga - Bayern") == "RLB"
+    assert competition_of("2. Bundesliga Women") is None
+    assert competition_of("Oberliga") is None
+
+
+def test_parse_team_schedule_includes_womens_cup():
+    from overlay.sources.goalapi import parse_team
+    matches = parse_team(load("goalapi_vfb_women_fixtures.json"))
+    cup = next(m for m in matches if m.kickoff == datetime(2026, 10, 30, 17, 0, tzinfo=timezone.utc))
+    assert (cup.competition, cup.home, cup.away, cup.status) == (
+        "DFBF", "Stuttgart Frauen", "SGS Essen Frauen", Status.SCHEDULED)
+    assert {m.competition for m in matches} <= {"DFBF", "FBL"}

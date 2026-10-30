@@ -11,7 +11,17 @@ LEAGUES = {
     "BL": "cmr77dvgm0002rx06rt2uqxii",
     "DFB": "cmr77dvgm0003rx06nnbqia6t",
     "FBL": "cmr77dvgm0008rx06s61intpw",
+    "DFBF": "cmr77dvgm0007rx06a1p4k59q",  # DFB-Pokal der Frauen
     "RLB": "cmr77dvgm000arx06ghs089wq",  # all Regionalliga divisions
+}
+TEAM_VFB_WOMEN = "cmr79ja8003yarx06fupnwezx"
+# goal-api league names (prefix before " - <round>") -> overlay competition code
+COMPETITIONS_BY_NAME = {
+    "Bundesliga": "BL",
+    "DFB Pokal": "DFB",
+    "DFB Pokal Women": "DFBF",
+    "Frauen Bundesliga": "FBL",
+    "Regionalliga": "RLB",
 }
 LIVE_PERIODS = {"FIRST_HALF", "SECOND_HALF", "EXTRA_TIME", "PENALTIES"}
 
@@ -59,3 +69,22 @@ def parse(fixtures: list[dict], competition: str) -> list[Match]:
 def fetch(competition: str, day: date, key: str) -> list[Match]:
     url = f"{BASE}/fixtures/date/{day:%Y-%m-%d}?leagueId={LEAGUES[competition]}&limit=100"
     return parse(get_json(url, headers={"Authorization": f"Bearer {key}"})["data"], competition)
+
+
+def competition_of(league_name: str) -> str | None:
+    return COMPETITIONS_BY_NAME.get(league_name.split(" - ")[0].strip())
+
+
+def parse_team(fixtures: list[dict]) -> list[Match]:
+    """A team's fixtures across competitions; unknown competitions are skipped."""
+    matches = []
+    for f in fixtures:
+        comp = competition_of(f.get("leagueName") or "")
+        if comp:
+            matches.extend(parse([f], comp))
+    return matches
+
+
+def fetch_team(team_id: str, key: str) -> list[Match]:
+    url = f"{BASE}/teams/{team_id}/fixtures?limit=100"
+    return parse_team(get_json(url, headers={"Authorization": f"Bearer {key}"})["data"])

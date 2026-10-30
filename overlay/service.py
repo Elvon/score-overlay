@@ -11,18 +11,33 @@ from overlay.sources import espn, goalapi, openligadb, thesportsdb
 Fetcher = Callable[[datetime], list[Match]]
 LiveFetcher = Callable[[str, datetime], list[Match]]  # (competition, now) -> today's matches
 
-LIVE_COMPETITIONS = ("BL", "DFB", "FBL", "RLB")
+LIVE_COMPETITIONS = ("BL", "DFB", "DFBF", "FBL", "RLB")
+TEAM_SCHEDULE_EVERY = timedelta(hours=1)
 LIVE_FAST = timedelta(minutes=1)    # while a match of the competition is live
 LIVE_SLOW = timedelta(minutes=30)   # matches today, none live
 LIVE_GIVE_UP = timedelta(minutes=5)  # then fall back to the regular sources
 log = logging.getLogger(__name__)
 
 
-def default_fetchers() -> dict[str, Fetcher]:
+def throttled(fetch: Fetcher, interval: timedelta) -> Fetcher:
+    """Calls fetch at most once per interval and returns the cached result in between."""
+    state: dict = {}
+
+    def wrapper(now: datetime) -> list[Match]:
+        last = state.get("at")
+        if last is None or now - last >= interval:
+            state["at"] = now  # also after a failure: retry only after the interval
+            state["result"] = fetch(now)
+        return state.get("result", [])
+
+    return wrapper
+
+
+def default_fetchers(goal_api_key: str | None = None) -> dict[str, Fetcher]:
     def espn_today(league: str, comp: str) -> Fetcher:
         return lambda now: espn.fetch(league, comp, now.astimezone().date())
 
-    return {
+    fetchers = {
         "bl1": lambda now: openligadb.fetch("bl1", "BL", now),
         "dfb": lambda now: openligadb.fetch("dfb", "DFB", now),
         "ffb1": lambda now: openligadb.fetch("ffb1", "FBL", now),
@@ -33,6 +48,11 @@ def default_fetchers() -> dict[str, Fetcher]:
         "vfb_ucl_schedule": lambda now: espn.fetch_schedule("uefa.champions", "UCL"),
         "1860": lambda now: thesportsdb.fetch(),
     }
+    if goal_api_key:
+        # Covers competitions the free sources lack, e.g. the women's DFB-Pokal.
+        fetchers["vfb_women_schedule"] = throttled(
+            lambda now: goalapi.fetch_team(goalapi.TEAM_VFB_WOMEN, goal_api_key), TEAM_SCHEDULE_EVERY)
+    return fetchers
 
 
 def goal_api_live_fetch(key: str) -> LiveFetcher:

@@ -18,7 +18,7 @@ from overlay.goals import GoalTracker
 from overlay.minute import estimate_minute
 from overlay.model import Match, Status
 from overlay.selection import SLOW_INTERVAL, is_focus, next_interval, next_matches
-from overlay.service import ScoreService, goal_api_live_fetch
+from overlay.service import ScoreService, default_fetchers, goal_api_live_fetch
 
 BG = "#111111"
 FG = "#ffffff"
@@ -118,7 +118,8 @@ class Overlay:
         if not config.on_screen(self.cfg, _virtual_desktop()):
             self.cfg = dict(config.DEFAULTS)  # monitor gone or config broken
         key = self.cfg.get("goal_api_key")
-        self.service = ScoreService(live_fetch=goal_api_live_fetch(key) if key else None)
+        self.service = ScoreService(fetchers=default_fetchers(key),
+                                    live_fetch=goal_api_live_fetch(key) if key else None)
         self.service.leagues = config.leagues(self.cfg)
         self.goals = GoalTracker()
         self.results: queue.Queue = queue.Queue()

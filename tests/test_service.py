@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+import pytest
 from datetime import datetime, timedelta
 
 from overlay.model import Match, Status
@@ -171,3 +172,65 @@ def test_goal_api_live_fetch_uses_local_date_and_key(monkeypatch):
                         lambda comp, day, key: seen.update(comp=comp, day=day, key=key) or [])
     svc.goal_api_live_fetch("k")("FBL", NOW)
     assert seen == {"comp": "FBL", "day": NOW.astimezone().date(), "key": "k"}
+
+
+def test_women_schedule_only_with_goal_api_key():
+    from overlay.service import default_fetchers
+    assert "vfb_women_schedule" in default_fetchers("key")
+    assert "vfb_women_schedule" not in default_fetchers()
+
+
+def test_throttled_fetch_at_most_once_per_interval():
+    from overlay.service import throttled
+    calls = []
+    fetch = throttled(lambda now: calls.append(now) or [GA_TODAY], timedelta(hours=1))
+    for minutes in (0, 10, 59, 60):
+        assert fetch(NOW + timedelta(minutes=minutes)) == [GA_TODAY]
+    assert len(calls) == 2
+
+
+def test_womens_cup_shows_in_preview():
+    from overlay.selection import next_matches
+    cup = Match("DFBF", "Stuttgart Frauen", "SGS Essen Frauen", None, None, Status.SCHEDULED,
+                NOW + timedelta(days=4))
+    league = Match("FBL", "1. FSV Mainz 05 Frauen", "VfB Stuttgart Frauen", None, None, Status.SCHEDULED,
+                   NOW + timedelta(days=13))
+    service = ScoreService({"ffb1": lambda now: [league], "ws": lambda now: [cup]})
+    shown = service.refresh(NOW)
+    assert ("VfB Frauen", cup) in next_matches(service.all_matches(), shown, NOW)
+
+
+def test_womens_cup_match_day_uses_own_live_competition():
+    cup_today = Match("DFBF", "Stuttgart Frauen", "SGS Essen Frauen", None, None, Status.SCHEDULED,
+                      NOW + timedelta(hours=2))
+    men_cup_today = Match("DFB", "SC Paderborn 07", "VfB Stuttgart", None, None, Status.SCHEDULED,
+                          NOW + timedelta(hours=6))
+    calls = []
+
+    def live(comp, now):
+        calls.append(comp)
+        return {"DFBF": [cup_today], "DFB": [men_cup_today]}[comp]
+
+    service = ScoreService({"ws": lambda now: [cup_today], "dfb": lambda now: [men_cup_today]},
+                           live_fetch=live)
+    service.refresh(NOW)
+    assert sorted(calls) == ["DFB", "DFBF"]
+    assert cup_today in service.all_matches()
+    assert men_cup_today in service.all_matches()
+
+
+def test_throttled_fetch_does_not_retry_failures_within_interval():
+    from overlay.service import throttled
+    calls = []
+
+    def failing(now):
+        calls.append(now)
+        raise OSError("limit reached")
+
+    fetch = throttled(failing, timedelta(hours=1))
+    with pytest.raises(OSError):
+        fetch(NOW)
+    assert fetch(NOW + timedelta(minutes=30)) == []
+    with pytest.raises(OSError):
+        fetch(NOW + timedelta(hours=1))
+    assert len(calls) == 2

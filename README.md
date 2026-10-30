@@ -4,7 +4,7 @@ Kleines, immer im Vordergrund liegendes Fenster mit Uhrzeit und Fußball-Spielst
 
 - An Bundesliga-Spieltagen alle Spiele des Tages, auf Wunsch auch an Champions-League-Abenden
 - VfB Stuttgart (Bundesliga, DFB-Pokal, Champions/Europa/Conference League)
-- VfB Stuttgart Frauen (Frauen-Bundesliga)
+- VfB Stuttgart Frauen (Frauen-Bundesliga; DFB-Pokal nur mit goal-api.com-Key)
 - TSV 1860 München (Regionalliga Bayern, DFB-Pokal)
 
 Spiele deiner Teams erscheinen 3 h vor Anpfiff und bleiben bis ca. 3 h nach Abpfiff stehen.
@@ -63,7 +63,8 @@ wird nur auf das Update hingewiesen (`git pull`).
 
 OpenLigaDB wird von Freiwilligen gepflegt; Live-Stände fehlen dort manchmal. Mit einem kostenlosen Key von
 [goal-api.com](https://goal-api.com) (1.000 Abfragen/Tag) kommen die heutigen Spiele von Bundesliga, DFB-Pokal,
-Frauen-Bundesliga und Regionalliga (1860) mit echter Spielminute von dort. In `config.json` eintragen:
+Frauen-Bundesliga, DFB-Pokal der Frauen und Regionalliga (1860) mit echter Spielminute von dort.
+Außerdem wird stündlich der Spielplan der VfB-Frauen geladen, damit auch Pokalspiele in der Vorschau erscheinen. In `config.json` eintragen:
 
 ```json
 "goal_api_key": "DEIN_KEY"
@@ -73,7 +74,7 @@ Abgefragt wird nur, wenn ein Wettbewerb heute spielt: jede Minute, solange ein S
 Fällt goal-api.com länger als 5 Minuten aus (oder ist das Tageslimit erreicht), springen die anderen Quellen ein.
 `config.json` ist nicht im Repository; das Overlay ändert beim Speichern nur seine eigenen Einträge.
 
-Bekannte Lücken: DFB-Pokal/Champions League der Frauen, Toto-Pokal. Live-Stände von 1860 können verzögert sein.
+Bekannte Lücken: DFB-Pokal der Frauen ohne goal-api.com-Key, Champions League der Frauen, Toto-Pokal. Live-Stände von 1860 können verzögert sein.
 Fehler beim Abruf werden in `overlay.log` protokolliert.
 
 ## Hinweis zu Datenquellen
