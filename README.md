@@ -77,6 +77,7 @@ Fällt goal-api.com länger als 5 Minuten aus (oder ist das Tageslimit erreicht)
 `config.json` ist nicht im Repository; das Overlay ändert beim Speichern nur seine eigenen Einträge.
 
 Bekannte Lücken: DFB-Pokal der Frauen ohne goal-api.com-Key, Champions League der Frauen, Toto-Pokal. Live-Stände von 1860 können verzögert sein.
+DFB-Pokal der Frauen: goal-api.com liefert nicht für jedes Spiel Live-Stände; solche Spiele erscheinen nach Anpfiff als `HH:MM?`.
 Fehler beim Abruf werden in `overlay.log` protokolliert.
 
 ## Hinweis zu Datenquellen
