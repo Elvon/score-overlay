@@ -13,6 +13,8 @@ class Status(Enum):
 # A match not marked finished this long after kickoff is treated as over
 # (postponed, or the source never updated it).
 LIVE_MAX = timedelta(hours=3)
+# Match.minute during the break; translated only when displayed.
+HALF_TIME = "HT"
 
 
 @dataclass(frozen=True)

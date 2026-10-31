@@ -2,6 +2,8 @@
 """Estimates the match minute for sources that do not report one."""
 from datetime import datetime
 
+from overlay.model import HALF_TIME
+
 FIRST_HALF = 45
 FIRST_HALF_END = 48      # incl. typical stoppage time
 SECOND_HALF_START = 63   # after a 15 minute break
@@ -15,7 +17,7 @@ def estimate_minute(kickoff: datetime, now: datetime) -> str:
     if elapsed < FIRST_HALF_END:
         return "~45+'"
     if elapsed < SECOND_HALF_START:
-        return "HZ"
+        return HALF_TIME
     if elapsed < SECOND_HALF_END:
         return f"~{46 + int(elapsed - SECOND_HALF_START)}'"
     return "~90+'"

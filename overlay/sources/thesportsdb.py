@@ -2,7 +2,7 @@
 """TheSportsDB (free key "123"): TSV 1860 München, Regionalliga Bayern."""
 from datetime import datetime, timezone
 
-from overlay.model import LIVE_MAX, Match, Status
+from overlay.model import HALF_TIME, LIVE_MAX, Match, Status
 from overlay.sources.http import get_json
 
 BASE = "https://www.thesportsdb.com/api/v1/json/123"  # free key; "3" was retired in Oct 2026
@@ -33,7 +33,7 @@ def parse(events: list[dict], now: datetime | None = None) -> list[Match]:
         elif raw in NOT_STARTED:
             status, minute = Status.SCHEDULED, None
         else:
-            status, minute = Status.LIVE, ("HZ" if raw == "HT" else None)
+            status, minute = Status.LIVE, (HALF_TIME if raw == "HT" else None)
         scheduled = status is Status.SCHEDULED
         matches.append(Match(
             competition="RLB" if "Regionalliga" in (ev.get("strLeague") or "") else "DFB",

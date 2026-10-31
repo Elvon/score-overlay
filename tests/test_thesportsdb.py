@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from overlay.model import Status
+from overlay.model import HALF_TIME, Status
 from overlay.sources.thesportsdb import parse
 
 FIX = Path(__file__).parent / "fixtures"
@@ -46,7 +46,7 @@ def test_tsdb_halftime_and_cup():
           "strAwayTeam": "Bayreuth", "intHomeScore": "1", "intAwayScore": "0",
           "strStatus": "HT", "strLeague": "DFB-Pokal"}
     m = parse([ev], now=DURING)[0]
-    assert (m.status, m.minute, m.competition, m.home_goals) == (Status.LIVE, "HZ", "DFB", 1)
+    assert (m.status, m.minute, m.competition, m.home_goals) == (Status.LIVE, HALF_TIME, "DFB", 1)
 
 
 def _ev(status, ts="2026-10-13T17:00:00"):

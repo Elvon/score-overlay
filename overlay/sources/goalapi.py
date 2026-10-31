@@ -2,7 +2,7 @@
 """goal-api.com (needs a free API key): reliable live scores for today's matches."""
 from datetime import date, datetime
 
-from overlay.model import Match, Status
+from overlay.model import HALF_TIME, Match, Status
 from overlay.sources.http import get_json
 
 BASE = "https://api.goal-api.com/v1"
@@ -47,7 +47,7 @@ def parse(fixtures: list[dict], competition: str) -> list[Match]:
         elif period == "FINISHED":
             status, minute = Status.FINISHED, None
         elif period == "HALF_TIME":
-            status, minute = Status.LIVE, "HZ"
+            status, minute = Status.LIVE, HALF_TIME
         elif period in LIVE_PERIODS:
             status, minute = Status.LIVE, f"{f.get('matchMinute')}'"
         else:  # postponed, cancelled, unknown

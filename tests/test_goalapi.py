@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from overlay.model import Status
+from overlay.model import HALF_TIME, Status
 from overlay.sources.goalapi import parse
 
 FIX = Path(__file__).parent / "fixtures"
@@ -41,7 +41,7 @@ def _fixture(period, minute, home="Munich 1860"):
 
 
 def test_half_time_and_stoppage():
-    assert parse([_fixture("HALF_TIME", "Half Time")], "RLB")[0].minute == "HZ"
+    assert parse([_fixture("HALF_TIME", "Half Time")], "RLB")[0].minute == HALF_TIME
     assert parse([_fixture("SECOND_HALF", "90+3")], "RLB")[0].minute == "90+3'"
     assert parse([_fixture("FIRST_HALF", "45+")], "RLB")[0].minute == "45+'"
 

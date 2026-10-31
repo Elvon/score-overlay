@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from overlay.minute import estimate_minute
+from overlay.model import HALF_TIME
 
 KICKOFF = datetime(2026, 10, 17, 13, 30, tzinfo=timezone.utc)
 
@@ -14,8 +15,8 @@ KICKOFF = datetime(2026, 10, 17, 13, 30, tzinfo=timezone.utc)
     (44.5, "~45'"),
     (45, "~45+'"),
     (47.9, "~45+'"),
-    (48, "HZ"),
-    (62.9, "HZ"),
+    (48, HALF_TIME),
+    (62.9, HALF_TIME),
     (63, "~46'"),
     (89, "~72'"),
     (107.9, "~90'"),
