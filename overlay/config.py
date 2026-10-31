@@ -38,6 +38,13 @@ def on_screen(cfg: dict, desktop: tuple[int, int, int, int]) -> bool:
     return dx + MIN_VISIBLE <= right <= dx + dw and dy <= y <= dy + dh - MIN_VISIBLE
 
 
+def placed(cfg: dict, desktop: tuple[int, int, int, int]) -> dict:
+    """cfg with the default position if the saved one is off screen; all other settings are kept."""
+    if on_screen(cfg, desktop):
+        return cfg
+    return {**cfg, "right": DEFAULTS["right"], "y": DEFAULTS["y"]}
+
+
 def leagues(cfg: dict) -> frozenset[str]:
     """Competitions whose other matches of the day are shown, per the menu switches."""
     return frozenset(code for code, key in (("BL", "all_bl"), ("UCL", "all_ucl")) if cfg.get(key))

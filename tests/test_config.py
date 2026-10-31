@@ -84,3 +84,14 @@ def test_ui_settings_keeps_language_only_when_set():
     assert "language" not in DEFAULTS
     assert "language" not in ui_settings(dict(DEFAULTS))
     assert ui_settings({**DEFAULTS, "language": "en"})["language"] == "en"
+
+
+def test_placed_resets_only_an_off_screen_position():
+    from overlay.config import DEFAULTS, placed
+    desktop = (0, 0, 1920, 1080)
+    cfg = {**DEFAULTS, "right": 5000, "y": 40, "language": "de", "goal_api_key": "k"}
+    result = placed(cfg, desktop)
+    assert (result["right"], result["y"]) == (DEFAULTS["right"], DEFAULTS["y"])
+    assert (result["language"], result["goal_api_key"]) == ("de", "k")
+    on_screen = {**cfg, "right": 1900}
+    assert placed(on_screen, desktop) == on_screen

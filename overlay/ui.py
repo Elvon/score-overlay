@@ -139,9 +139,7 @@ class Overlay:
         self.about_window: tk.Toplevel | None = None
         self.about_status: tk.Label | None = None
         self.popup = PopupGuard()
-        self.cfg = config.load(config_path)
-        if not config.on_screen(self.cfg, _virtual_desktop()):
-            self.cfg = dict(config.DEFAULTS)  # monitor gone or config broken
+        self.cfg = config.placed(config.load(config_path), _virtual_desktop())  # monitor gone?
         i18n.set_language(i18n.resolve(self.cfg.get("language")))
         key = self.cfg.get("goal_api_key")
         self.service = ScoreService(fetchers=default_fetchers(key),
