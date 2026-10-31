@@ -1,109 +1,114 @@
+Deutsch: [README.de.md](README.de.md)
+
 # Score-Overlay
 
-Kleines, immer im Vordergrund liegendes Fenster mit Uhrzeit und Fußball-Spielständen:
+A small always-on-top window with the time and football scores:
 
-- An Bundesliga-Spieltagen alle Spiele des Tages, auf Wunsch auch an Champions-League-Abenden
+- On Bundesliga matchdays all matches of the day, optionally also on Champions League nights
 - VfB Stuttgart (Bundesliga, DFB-Pokal, Champions/Europa/Conference League)
-- VfB Stuttgart Frauen (Frauen-Bundesliga; DFB-Pokal nur mit goal-api.com-Key)
+- VfB Stuttgart women (Frauen-Bundesliga; women's DFB-Pokal only with a goal-api.com key)
 - TSV 1860 München (Regionalliga Bayern, DFB-Pokal)
 
-Spiele deiner Teams erscheinen 3 h vor Anpfiff und bleiben bis ca. 3 h nach Abpfiff stehen.
+Matches of your teams appear 3 h before kickoff and stay until about 3 h after the final whistle.
 
-- Unter der Uhr steht pro Team (VfB, VfB Frauen, 1860) das nächste Spiel, solange gerade keins angezeigt wird.
-- Fällt in einem Spiel deiner Teams ein Tor, blinkt die Zeile ~10 s (grün = eigenes Tor, rot = Gegentor),
-  optional mit Ton. Standard ist `C:\Windows\Media\tada.wav`; eine andere WAV-Datei lässt sich
-  in `config.json` unter `"sound_file"` eintragen (Backslashes doppelt, z.B. `"D:\\Sounds\\tor.wav"`).
-  Der Ton spielt unabhängig vom Windows-Soundschema.
-- Es läuft immer nur ein Overlay; ein zweiter Start beendet sich sofort.
-- Liefert eine Quelle keine Spielminute (Bundesliga, Frauen, 1860), wird sie aus der Anstoßzeit
-  geschätzt und mit `~` markiert (z.B. `~67'`, `HZ`, `~90+'`).
-- Schlägt der letzte Abruf einer Quelle fehl, werden ihre Spiele grau mit `?` hinter dem Stand angezeigt.
-- Meldet die Quelle ein Spiel 10 Minuten nach Anpfiff noch nicht als gestartet, wird es grau mit `?` hinter
-  der Anstoßzeit angezeigt (z.B. `18:00?`): Für dieses Spiel gibt es dort keine Live-Daten.
+- Below the clock, the next match of each team (VfB, VfB women, 1860) is shown while none of theirs is on screen.
+- When a goal is scored in a match of your teams, the row flashes for ~10 s (green = your goal, red = conceded),
+  optionally with a sound. The default is `C:\Windows\Media\tada.wav`; another WAV file can be set
+  in `config.json` as `"sound_file"` (double the backslashes, e.g. `"D:\\Sounds\\goal.wav"`).
+  The sound plays regardless of the Windows sound scheme.
+- Only one overlay runs at a time; a second start exits right away.
+- If a source reports no match minute (Bundesliga, women, 1860), it is estimated from the kickoff time
+  and marked with `~` (e.g. `~67'`, `HT`, `~90+'`).
+- If the last request to a source failed, its matches are shown in grey with `?` after the score.
+- If a source still reports a match as not started 10 minutes after kickoff, it is shown in grey with `?` after
+  the kickoff time (e.g. `18:00?`): there is no live data for this match.
 
 ## Installation
 
-1. [Python 3.13](https://www.python.org/downloads/) installieren (keine weiteren Pakete nötig).
-2. Auf der [Release-Seite](https://codeberg.org/ElvonMF/score-overlay/releases) das ZIP der neuesten Version
-   herunterladen und in einen Ordner entpacken, z.B. `%LOCALAPPDATA%\score-overlay`.
-3. `start.pyw` doppelklicken.
+1. Install [Python 3.13](https://www.python.org/downloads/) (no other packages needed).
+2. Download the ZIP of the latest version from the [releases page](https://codeberg.org/ElvonMF/score-overlay/releases)
+   and extract it to a folder, e.g. `%LOCALAPPDATA%\score-overlay`.
+3. Double-click `start.pyw`.
 
-## Bedienung
+## Usage
 
-- Linke Maustaste: Fenster verschieben (Position wird in `config.json` gespeichert)
-- Rechte Maustaste: „Aktualisieren“, Schalter (werden gespeichert), „Über Score-Overlay…“, „Beenden“
-  - „Vorschau“ – nächstes Spiel pro Team unter der Uhr
-  - „Alle Bundesliga-Spiele“ – an Spieltagen auch die Spiele ohne deine Teams (Standard: an)
-  - „Alle Champions-League-Spiele“ – an CL-Abenden auch die übrigen Spiele (Standard: aus)
-  - „Ton bei Tor“
+- Left mouse button: move the window (the position is saved in `config.json`)
+- Right mouse button: "Refresh", switches (saved), "Sprache / Language", "About Score-Overlay…", "Quit"
+  - "Preview" – next match of each team below the clock
+  - "All Bundesliga matches" – on matchdays also the matches without your teams (default: on)
+  - "All Champions League matches" – on CL nights also the other matches (default: off)
+  - "Sound on goal"
+  - "Sprache / Language" – German or English. Without a choice the language follows the Windows display
+    language (German for a German Windows, otherwise English). The choice is saved as `"language": "de"` or `"en"`
+    in `config.json` and can also be entered there by hand.
 
-Spiele vom VfB (Männer/Frauen) und von 1860 werden immer angezeigt und stehen immer oben,
-danach folgen Bundesliga- und Champions-League-Spiele nach Anstoßzeit.
+Matches of VfB (men/women) and 1860 are always shown and always on top,
+followed by Bundesliga and Champions League matches by kickoff time.
 
 ## Updates
 
-Das Overlay sucht eine Minute nach dem Start und danach täglich nach einer neuen Version (oder per
-„Über Score-Overlay…“ → „Nach Updates suchen“). Gibt es eine, erscheint im Rechtsklick-Menü
-„Update auf vX.Y.Z installieren“: Download von Codeberg, Installation, Neustart. `config.json` und `overlay.log`
-bleiben erhalten; die vorherige Version liegt in `.update-backup/`. Läuft das Overlay aus einem Git-Klon,
-wird nur auf das Update hingewiesen (`git pull`).
+The overlay checks for a new version one minute after start and then daily (or via
+"About Score-Overlay…" → "Check for updates"). If there is one, the right-click menu shows
+"Install update to vX.Y.Z": download from Codeberg, installation, restart. `config.json` and `overlay.log`
+are kept; the previous version is moved to `.update-backup/`. If the overlay runs from a Git clone,
+it only points out the update (`git pull`).
 
 ### Autostart
 
-`Win + R` → `shell:startup` → Verknüpfung zu `start.pyw` in den Ordner legen.
+`Win + R` → `shell:startup` → put a shortcut to `start.pyw` into that folder.
 
-## Datenquellen
+## Data sources
 
-| Quelle | Wofür |
+| Source | Used for |
 |---|---|
 | [OpenLigaDB](https://www.openligadb.de) | Bundesliga, DFB-Pokal, Frauen-Bundesliga |
-| ESPN (inoffizielle Scoreboard-API) | Champions League, Europa League, Conference League, VfB-Spielplan Champions League |
-| [TheSportsDB](https://www.thesportsdb.com) (Free-Key „123“) | TSV 1860 München |
-| [goal-api.com](https://goal-api.com) (optional, eigener Key) | Live-Stände des Tages: Bundesliga, DFB-Pokal, Frauen-Bundesliga, Regionalliga |
+| ESPN (unofficial scoreboard API) | Champions League, Europa League, Conference League, VfB Champions League schedule |
+| [TheSportsDB](https://www.thesportsdb.com) (free key "123") | TSV 1860 München |
+| [goal-api.com](https://goal-api.com) (optional, own key) | Today's live scores: Bundesliga, DFB-Pokal, Frauen-Bundesliga, Regionalliga |
 
-### Optional: goal-api.com für zuverlässige Live-Stände
+### Optional: goal-api.com for reliable live scores
 
-OpenLigaDB wird von Freiwilligen gepflegt; Live-Stände fehlen dort manchmal. Mit einem kostenlosen Key von
-[goal-api.com](https://goal-api.com) (1.000 Abfragen/Tag) kommen die heutigen Spiele von Bundesliga, DFB-Pokal,
-Frauen-Bundesliga, DFB-Pokal der Frauen und Regionalliga (1860) mit echter Spielminute von dort.
-Außerdem wird stündlich der Spielplan der VfB-Frauen geladen, damit auch Pokalspiele in der Vorschau erscheinen. In `config.json` eintragen:
+OpenLigaDB is maintained by volunteers; live scores are sometimes missing there. With a free key from
+[goal-api.com](https://goal-api.com) (1,000 requests/day), today's matches of Bundesliga, DFB-Pokal,
+Frauen-Bundesliga, women's DFB-Pokal and Regionalliga (1860) come from there, with the real match minute.
+In addition, the VfB women's schedule is loaded hourly so that cup matches also appear in the preview. Add to `config.json`:
 
 ```json
-"goal_api_key": "DEIN_KEY"
+"goal_api_key": "YOUR_KEY"
 ```
 
-Abgefragt wird nur, wenn ein Wettbewerb heute spielt: jede Minute, solange ein Spiel läuft, sonst alle 30 Minuten.
-Fällt goal-api.com länger als 5 Minuten aus (oder ist das Tageslimit erreicht), springen die anderen Quellen ein.
-`config.json` ist nicht im Repository; das Overlay ändert beim Speichern nur seine eigenen Einträge.
+Requests are only made when a competition plays today: every minute while a match is live, otherwise every 30 minutes.
+If goal-api.com fails for more than 5 minutes (or the daily limit is reached), the other sources take over.
+`config.json` is not part of the repository; when saving, the overlay only changes its own entries.
 
-Bekannte Lücken: DFB-Pokal der Frauen ohne goal-api.com-Key, Champions League der Frauen, Toto-Pokal. Live-Stände von 1860 können verzögert sein.
-DFB-Pokal der Frauen: goal-api.com liefert nicht für jedes Spiel Live-Stände; solche Spiele erscheinen nach Anpfiff als `HH:MM?`.
-Fehler beim Abruf werden in `overlay.log` protokolliert.
+Known gaps: women's DFB-Pokal without a goal-api.com key, women's Champions League, Toto-Pokal. Live scores of 1860 may be delayed.
+Women's DFB-Pokal: goal-api.com does not provide live scores for every match; such matches show as `HH:MM?` after kickoff.
+Errors while fetching are logged to `overlay.log`.
 
-## Hinweis zu Datenquellen
+## Note on data sources
 
-Die Lizenz unten gilt nur für den Code dieses Programms. Die angezeigten Daten gehören den jeweiligen Anbietern
-(OpenLigaDB, ESPN, TheSportsDB, goal-api.com); es gelten deren Nutzungsbedingungen. Die ESPN-Schnittstelle ist
-inoffiziell und nicht für Dritte dokumentiert. Die Nutzung erfolgt auf eigene Verantwortung.
+The license below covers only the code of this program. The data shown belongs to the respective providers
+(OpenLigaDB, ESPN, TheSportsDB, goal-api.com); their terms of use apply. The ESPN interface is
+unofficial and not documented for third parties. Use at your own risk.
 
-## Entwicklung
+## Development
 
 ```
 py -m pip install --user pytest
 py -m pytest -q
 ```
 
-Neue Version veröffentlichen:
+Publishing a new version:
 
-1. `__version__` in `overlay/__init__.py` erhöhen, committen.
-2. Tag `vX.Y.Z` anlegen und pushen.
-3. Auf Codeberg unter „Releases“ ein Release zu diesem Tag anlegen (nur Releases werden als Update angeboten).
+1. Increase `__version__` in `overlay/__init__.py`, commit.
+2. Create and push the tag `vX.Y.Z`.
+3. On Codeberg, create a release for that tag under "Releases" (only releases are offered as updates).
 
-## Lizenz
+## License
 
 Copyright (C) 2026 ElvonMF
 
-Dieses Programm ist freie Software: Sie können es unter den Bedingungen der GNU General Public License,
-wie von der Free Software Foundation veröffentlicht, weitergeben und/oder modifizieren, entweder gemäß
-Version 3 der Lizenz oder (nach Ihrer Wahl) jeder späteren Version (GPL-3.0-or-later).
-Es wird ohne jede Gewährleistung bereitgestellt. Details in [LICENSE](LICENSE).
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General
+Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
+any later version (GPL-3.0-or-later).
+It is provided without any warranty. See [LICENSE](LICENSE) for details.

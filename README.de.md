@@ -1,0 +1,114 @@
+English: [README.md](README.md)
+
+# Score-Overlay
+
+Kleines, immer im Vordergrund liegendes Fenster mit Uhrzeit und Fußball-Spielständen:
+
+- An Bundesliga-Spieltagen alle Spiele des Tages, auf Wunsch auch an Champions-League-Abenden
+- VfB Stuttgart (Bundesliga, DFB-Pokal, Champions/Europa/Conference League)
+- VfB Stuttgart Frauen (Frauen-Bundesliga; DFB-Pokal nur mit goal-api.com-Key)
+- TSV 1860 München (Regionalliga Bayern, DFB-Pokal)
+
+Spiele deiner Teams erscheinen 3 h vor Anpfiff und bleiben bis ca. 3 h nach Abpfiff stehen.
+
+- Unter der Uhr steht pro Team (VfB, VfB Frauen, 1860) das nächste Spiel, solange gerade keins angezeigt wird.
+- Fällt in einem Spiel deiner Teams ein Tor, blinkt die Zeile ~10 s (grün = eigenes Tor, rot = Gegentor),
+  optional mit Ton. Standard ist `C:\Windows\Media\tada.wav`; eine andere WAV-Datei lässt sich
+  in `config.json` unter `"sound_file"` eintragen (Backslashes doppelt, z.B. `"D:\\Sounds\\tor.wav"`).
+  Der Ton spielt unabhängig vom Windows-Soundschema.
+- Es läuft immer nur ein Overlay; ein zweiter Start beendet sich sofort.
+- Liefert eine Quelle keine Spielminute (Bundesliga, Frauen, 1860), wird sie aus der Anstoßzeit
+  geschätzt und mit `~` markiert (z.B. `~67'`, `HZ`, `~90+'`).
+- Schlägt der letzte Abruf einer Quelle fehl, werden ihre Spiele grau mit `?` hinter dem Stand angezeigt.
+- Meldet die Quelle ein Spiel 10 Minuten nach Anpfiff noch nicht als gestartet, wird es grau mit `?` hinter
+  der Anstoßzeit angezeigt (z.B. `18:00?`): Für dieses Spiel gibt es dort keine Live-Daten.
+
+## Installation
+
+1. [Python 3.13](https://www.python.org/downloads/) installieren (keine weiteren Pakete nötig).
+2. Auf der [Release-Seite](https://codeberg.org/ElvonMF/score-overlay/releases) das ZIP der neuesten Version
+   herunterladen und in einen Ordner entpacken, z.B. `%LOCALAPPDATA%\score-overlay`.
+3. `start.pyw` doppelklicken.
+
+## Bedienung
+
+- Linke Maustaste: Fenster verschieben (Position wird in `config.json` gespeichert)
+- Rechte Maustaste: „Aktualisieren“, Schalter (werden gespeichert), „Sprache / Language“, „Über Score-Overlay…“, „Beenden“
+  - „Vorschau“ – nächstes Spiel pro Team unter der Uhr
+  - „Alle Bundesliga-Spiele“ – an Spieltagen auch die Spiele ohne deine Teams (Standard: an)
+  - „Alle Champions-League-Spiele“ – an CL-Abenden auch die übrigen Spiele (Standard: aus)
+  - „Ton bei Tor“
+  - „Sprache / Language“ – Deutsch oder Englisch. Ohne Auswahl folgt die Sprache der Windows-Anzeigesprache
+    (Deutsch bei deutschem Windows, sonst Englisch). Die Auswahl wird als `"language": "de"` bzw. `"en"`
+    in `config.json` gespeichert und lässt sich dort auch von Hand eintragen.
+
+Spiele vom VfB (Männer/Frauen) und von 1860 werden immer angezeigt und stehen immer oben,
+danach folgen Bundesliga- und Champions-League-Spiele nach Anstoßzeit.
+
+## Updates
+
+Das Overlay sucht eine Minute nach dem Start und danach täglich nach einer neuen Version (oder per
+„Über Score-Overlay…“ → „Nach Updates suchen“). Gibt es eine, erscheint im Rechtsklick-Menü
+„Update auf vX.Y.Z installieren“: Download von Codeberg, Installation, Neustart. `config.json` und `overlay.log`
+bleiben erhalten; die vorherige Version liegt in `.update-backup/`. Läuft das Overlay aus einem Git-Klon,
+wird nur auf das Update hingewiesen (`git pull`).
+
+### Autostart
+
+`Win + R` → `shell:startup` → Verknüpfung zu `start.pyw` in den Ordner legen.
+
+## Datenquellen
+
+| Quelle | Wofür |
+|---|---|
+| [OpenLigaDB](https://www.openligadb.de) | Bundesliga, DFB-Pokal, Frauen-Bundesliga |
+| ESPN (inoffizielle Scoreboard-API) | Champions League, Europa League, Conference League, VfB-Spielplan Champions League |
+| [TheSportsDB](https://www.thesportsdb.com) (Free-Key „123“) | TSV 1860 München |
+| [goal-api.com](https://goal-api.com) (optional, eigener Key) | Live-Stände des Tages: Bundesliga, DFB-Pokal, Frauen-Bundesliga, Regionalliga |
+
+### Optional: goal-api.com für zuverlässige Live-Stände
+
+OpenLigaDB wird von Freiwilligen gepflegt; Live-Stände fehlen dort manchmal. Mit einem kostenlosen Key von
+[goal-api.com](https://goal-api.com) (1.000 Abfragen/Tag) kommen die heutigen Spiele von Bundesliga, DFB-Pokal,
+Frauen-Bundesliga, DFB-Pokal der Frauen und Regionalliga (1860) mit echter Spielminute von dort.
+Außerdem wird stündlich der Spielplan der VfB-Frauen geladen, damit auch Pokalspiele in der Vorschau erscheinen. In `config.json` eintragen:
+
+```json
+"goal_api_key": "DEIN_KEY"
+```
+
+Abgefragt wird nur, wenn ein Wettbewerb heute spielt: jede Minute, solange ein Spiel läuft, sonst alle 30 Minuten.
+Fällt goal-api.com länger als 5 Minuten aus (oder ist das Tageslimit erreicht), springen die anderen Quellen ein.
+`config.json` ist nicht im Repository; das Overlay ändert beim Speichern nur seine eigenen Einträge.
+
+Bekannte Lücken: DFB-Pokal der Frauen ohne goal-api.com-Key, Champions League der Frauen, Toto-Pokal. Live-Stände von 1860 können verzögert sein.
+DFB-Pokal der Frauen: goal-api.com liefert nicht für jedes Spiel Live-Stände; solche Spiele erscheinen nach Anpfiff als `HH:MM?`.
+Fehler beim Abruf werden in `overlay.log` protokolliert.
+
+## Hinweis zu Datenquellen
+
+Die Lizenz unten gilt nur für den Code dieses Programms. Die angezeigten Daten gehören den jeweiligen Anbietern
+(OpenLigaDB, ESPN, TheSportsDB, goal-api.com); es gelten deren Nutzungsbedingungen. Die ESPN-Schnittstelle ist
+inoffiziell und nicht für Dritte dokumentiert. Die Nutzung erfolgt auf eigene Verantwortung.
+
+## Entwicklung
+
+```
+py -m pip install --user pytest
+py -m pytest -q
+```
+
+Neue Version veröffentlichen:
+
+1. `__version__` in `overlay/__init__.py` erhöhen, committen.
+2. Tag `vX.Y.Z` anlegen und pushen.
+3. Auf Codeberg unter „Releases“ ein Release zu diesem Tag anlegen (nur Releases werden als Update angeboten).
+
+## Lizenz
+
+Copyright (C) 2026 ElvonMF
+
+Dieses Programm ist freie Software: Sie können es unter den Bedingungen der GNU General Public License,
+wie von der Free Software Foundation veröffentlicht, weitergeben und/oder modifizieren, entweder gemäß
+Version 3 der Lizenz oder (nach Ihrer Wahl) jeder späteren Version (GPL-3.0-or-later).
+Es wird ohne jede Gewährleistung bereitgestellt. Details in [LICENSE](LICENSE).
