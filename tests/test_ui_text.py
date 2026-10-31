@@ -83,16 +83,17 @@ def test_install_click_ignored_while_installing(monkeypatch):
     from overlay import ui
     from overlay.updater import UpdateInfo
     asked, started = [], []
-    monkeypatch.setattr(ui.messagebox, "askyesno", lambda *a, **k: asked.append(1) or True)
-    monkeypatch.setattr(ui.threading, "Thread", lambda target, daemon: type("T", (), {"start": lambda self: started.append(1)})())
     o = ui.Overlay.__new__(ui.Overlay)
+    o.popup = ui.PopupGuard()
+    monkeypatch.setattr(ui.messagebox, "askyesno", lambda *a, **k: asked.append(o.popup.active) or True)
+    monkeypatch.setattr(ui.threading, "Thread", lambda target, daemon: type("T", (), {"start": lambda self: started.append(1)})())
     o.root = None
     o.update_info = UpdateInfo(True, "1.6.0", None)
     o.installing = False
     o._refresh_update_entry = lambda: None
     o._install_update()
     o._install_update()
-    assert (len(asked), len(started), o.installing) == (1, 1, True)
+    assert (asked, len(started), o.installing, o.popup.active) == ([True], 1, True, False)
 
 
 def test_status_text_known_update_after_failed_check():
@@ -133,3 +134,25 @@ def test_live_and_finished_matches_are_never_overdue():
     later = kickoff + timedelta(hours=1)
     assert not is_overdue(Match("BL", "A", "B", 0, 0, Status.LIVE, kickoff), later)
     assert not is_overdue(Match("BL", "A", "B", 0, 0, Status.FINISHED, kickoff), later)
+
+
+def test_popup_guard_is_active_only_while_a_popup_is_open():
+    from overlay.ui import PopupGuard
+    guard = PopupGuard()
+    assert not guard.active
+    with guard:
+        assert guard.active
+        with guard:  # dialog opened from the menu
+            assert guard.active
+        assert guard.active
+    assert not guard.active
+
+
+def test_popup_guard_releases_on_error():
+    import pytest
+    from overlay.ui import PopupGuard
+    guard = PopupGuard()
+    with pytest.raises(RuntimeError):
+        with guard:
+            raise RuntimeError
+    assert not guard.active

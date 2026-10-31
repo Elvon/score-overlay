@@ -109,6 +109,23 @@ def format_suffix(m: Match, now: datetime) -> str:
     return time + "?" if is_overdue(m, now) else time
 
 
+class PopupGuard:
+    """Tracks open menus/dialogs; while one is open the overlay must not raise itself above it."""
+
+    def __init__(self):
+        self.depth = 0
+
+    @property
+    def active(self) -> bool:
+        return self.depth > 0
+
+    def __enter__(self) -> None:
+        self.depth += 1
+
+    def __exit__(self, *exc) -> None:
+        self.depth -= 1
+
+
 class Overlay:
     def __init__(self, config_path: Path):
         self.config_path = config_path
@@ -120,6 +137,7 @@ class Overlay:
         self.check_now = threading.Event()
         self.about_window: tk.Toplevel | None = None
         self.about_status: tk.Label | None = None
+        self.popup = PopupGuard()
         self.cfg = config.load(config_path)
         if not config.on_screen(self.cfg, _virtual_desktop()):
             self.cfg = dict(config.DEFAULTS)  # monitor gone or config broken
@@ -165,7 +183,7 @@ class Overlay:
         self.root.bind_all("<ButtonPress-1>", self._drag_start)
         self.root.bind_all("<B1-Motion>", self._drag_move)
         self.root.bind_all("<ButtonRelease-1>", self._drag_end)
-        self.root.bind_all("<Button-3>", lambda e: self.menu.tk_popup(e.x_root, e.y_root))
+        self.root.bind_all("<Button-3>", self._show_menu)
 
         self._tick()
         self._place()
@@ -276,9 +294,14 @@ class Overlay:
         self.root.geometry(f"+{right - width}+{self.cfg['y']}")
 
     def _keep_on_top(self) -> None:
-        self.root.attributes("-topmost", True)
-        self.root.lift()
+        if not self.popup.active:  # raising now would cover the open menu/dialog
+            self.root.attributes("-topmost", True)
+            self.root.lift()
         self.root.after(TOPMOST_EVERY_MS, self._keep_on_top)
+
+    def _show_menu(self, event) -> None:
+        with self.popup:  # tk_popup blocks on Windows until the menu is closed
+            self.menu.tk_popup(event.x_root, event.y_root)
 
     # --- updates ---------------------------------------------------------
     def _update_worker(self) -> None:
@@ -299,7 +322,8 @@ class Overlay:
         elif kind == "failed":
             self.installing = False
             self._refresh_update_entry()
-            messagebox.showerror("Update fehlgeschlagen", str(payload), parent=self.root)
+            with self.popup:
+                messagebox.showerror("Update fehlgeschlagen", str(payload), parent=self.root)
         if self.about_status is not None and self.about_status.winfo_exists():
             self.about_status.config(text=f"Update: {status_text(self.update_info)}")
 
@@ -327,7 +351,9 @@ class Overlay:
             return
         version = self.update_info.version
         question = f"Version {version} herunterladen und installieren?\nDas Overlay startet danach neu."
-        if not messagebox.askyesno("Update", question, parent=self.root):
+        with self.popup:
+            confirmed = messagebox.askyesno("Update", question, parent=self.root)
+        if not confirmed:
             return
         self.installing = True
         self._refresh_update_entry()
