@@ -43,7 +43,7 @@ def leagues(cfg: dict) -> frozenset[str]:
     return frozenset(code for code, key in (("BL", "all_bl"), ("UCL", "all_ucl")) if cfg.get(key))
 
 
-UI_KEYS = ("right", "y", "sound", "preview", "all_bl", "all_ucl")
+UI_KEYS = ("right", "y", "sound", "preview", "all_bl", "all_ucl", "language")
 
 
 def ui_settings(cfg: dict) -> dict:

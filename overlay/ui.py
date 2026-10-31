@@ -142,6 +142,7 @@ class Overlay:
         self.cfg = config.load(config_path)
         if not config.on_screen(self.cfg, _virtual_desktop()):
             self.cfg = dict(config.DEFAULTS)  # monitor gone or config broken
+        i18n.set_language(i18n.resolve(self.cfg.get("language")))
         key = self.cfg.get("goal_api_key")
         self.service = ScoreService(fetchers=default_fetchers(key),
                                     live_fetch=goal_api_live_fetch(key) if key else None)
@@ -152,6 +153,7 @@ class Overlay:
         self.row_labels: dict[tuple, tuple[list[tk.Label], str]] = {}
         self.flashing: dict[tuple, tuple[str, float]] = {}
         self.flash_on = False
+        self.last_render: tuple | None = None
 
         self.root = tk.Tk()
         self.root.overrideredirect(True)
@@ -167,19 +169,11 @@ class Overlay:
         self.table.pack(anchor="e", padx=10, pady=(0, 6))
 
         self.menu = tk.Menu(self.root, tearoff=0)
-        self.menu.add_command(label="Aktualisieren", command=self.wake.set)
-        self.switches: dict[str, tk.BooleanVar] = {}
-        self.menu.add_separator()
-        for key, label in (("preview", "Vorschau"), ("all_bl", "Alle Bundesliga-Spiele"),
-                           ("all_ucl", "Alle Champions-League-Spiele"), ("sound", "Ton bei Tor")):
-            var = tk.BooleanVar(value=bool(self.cfg.get(key)))
-            self.switches[key] = var
-            self.menu.add_checkbutton(label=label, variable=var,
-                                      command=lambda k=key: self._toggle(k))
-        self.menu.add_separator()
-        self.menu.add_command(label="Über Score-Overlay…", command=self._show_about)
-        self.update_entry = False  # whether the menu currently has an update entry
-        self.menu.add_command(label="Beenden", command=self.root.destroy)
+        self.language_menu = tk.Menu(self.menu, tearoff=0)
+        self.language_var = tk.StringVar()
+        self.switches = {key: tk.BooleanVar(value=bool(self.cfg.get(key)))
+                         for key in ("preview", "all_bl", "all_ucl", "sound")}
+        self._build_menu()
 
         self.root.bind_all("<ButtonPress-1>", self._drag_start)
         self.root.bind_all("<B1-Motion>", self._drag_move)
@@ -193,6 +187,38 @@ class Overlay:
         self._flash_tick()
         threading.Thread(target=self._worker, daemon=True).start()
         threading.Thread(target=self._update_worker, daemon=True).start()
+
+    def _build_menu(self) -> None:
+        """(Re)builds the right-click menu in the current language."""
+        self.menu.delete(0, "end")
+        self.menu.add_command(label=t("menu_refresh"), command=self.wake.set)
+        self.menu.add_separator()
+        for key in self.switches:
+            self.menu.add_checkbutton(label=t(f"menu_{key}"), variable=self.switches[key],
+                                      command=lambda k=key: self._toggle(k))
+        self.menu.add_separator()
+        self.language_menu.delete(0, "end")
+        self.language_var.set(i18n.language())
+        for lang, name in (("de", "Deutsch"), ("en", "English")):
+            self.language_menu.add_radiobutton(label=name, value=lang, variable=self.language_var,
+                                               command=lambda l=lang: self._set_language(l))
+        self.menu.add_cascade(label=t("menu_language"), menu=self.language_menu)
+        self.menu.add_command(label=t("menu_about"), command=self._show_about)
+        self.update_entry = False  # whether the menu currently has an update entry
+        self.menu.add_command(label=t("menu_quit"), command=self.root.destroy)
+        self._refresh_update_entry()
+
+    def _set_language(self, lang: str) -> None:
+        self.cfg["language"] = lang
+        config.save(self.config_path, config.ui_settings(self.cfg))
+        i18n.set_language(lang)
+        self._build_menu()
+        if self.last_render is not None:
+            matches, upcoming, _goals, stale = self.last_render
+            self._render(matches, upcoming, {}, stale)  # no second goal flash
+        if self.about_window is not None and self.about_window.winfo_exists():
+            self.about_window.destroy()
+            self._show_about()
 
     # --- background fetching -------------------------------------------
     def _worker(self) -> None:
@@ -231,6 +257,7 @@ class Overlay:
 
     def _render(self, matches: list[Match], upcoming: list[tuple[str, Match]],
                 goals: dict[Match, str], stale: set[Match]) -> None:
+        self.last_render = (matches, upcoming, goals, stale)
         now = datetime.now(timezone.utc)
         for w in self.upcoming.winfo_children():
             w.destroy()
@@ -324,9 +351,9 @@ class Overlay:
             self.installing = False
             self._refresh_update_entry()
             with self.popup:
-                messagebox.showerror("Update fehlgeschlagen", str(payload), parent=self.root)
+                messagebox.showerror(t("update_failed_title"), str(payload), parent=self.root)
         if self.about_status is not None and self.about_status.winfo_exists():
-            self.about_status.config(text=f"Update: {status_text(self.update_info)}")
+            self.about_status.config(text=t("about_update", status=status_text(self.update_info)))
 
     def _refresh_update_entry(self) -> None:
         end = self.menu.index("end")  # "Beenden"
@@ -338,12 +365,12 @@ class Overlay:
         if not (info and info.available):
             return
         if self.installing:
-            self.menu.insert_command(end, label=f"Update auf v{info.version} wird installiert…", state="disabled")
+            self.menu.insert_command(end, label=t("update_installing", version=info.version), state="disabled")
         elif updater.is_git_checkout(self.app_dir):
-            self.menu.insert_command(end, label=f"v{info.version} verfügbar – per git pull aktualisieren",
+            self.menu.insert_command(end, label=t("update_git", version=info.version),
                                      state="disabled")
         else:
-            self.menu.insert_command(end, label=f"Update auf v{info.version} installieren",
+            self.menu.insert_command(end, label=t("update_install", version=info.version),
                                      command=self._install_update)
         self.update_entry = True
 
@@ -351,7 +378,7 @@ class Overlay:
         if self.installing:
             return
         version = self.update_info.version
-        question = f"Version {version} herunterladen und installieren?\nDas Overlay startet danach neu."
+        question = t("update_question", version=version)
         with self.popup:
             confirmed = messagebox.askyesno("Update", question, parent=self.root)
         if not confirmed:
@@ -373,7 +400,7 @@ class Overlay:
             self.about_window.lift()
             return
         win = tk.Toplevel(self.root, bg=BG, padx=16, pady=12)
-        win.title("Über Score-Overlay")
+        win.title(t("about_title"))
         win.attributes("-topmost", True)
         win.resizable(False, False)
         lines = about_lines(__version__, status_text(self.update_info))
@@ -388,12 +415,12 @@ class Overlay:
         self.about_status.pack(anchor="w", pady=(6, 10))
         buttons = tk.Frame(win, bg=BG)
         buttons.pack(anchor="e")
-        tk.Button(buttons, text="Nach Updates suchen", command=self._check_from_about).pack(side="left", padx=4)
-        tk.Button(buttons, text="Schließen", command=win.destroy).pack(side="left")
+        tk.Button(buttons, text=t("about_check"), command=self._check_from_about).pack(side="left", padx=4)
+        tk.Button(buttons, text=t("about_close"), command=win.destroy).pack(side="left")
         self.about_window = win
 
     def _check_from_about(self) -> None:
-        self.about_status.config(text="Update: Wird geprüft…")
+        self.about_status.config(text=t("about_update", status=t("status_checking")))
         self.check_now.set()
 
     # --- dragging --------------------------------------------------------

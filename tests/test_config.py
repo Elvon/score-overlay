@@ -77,3 +77,10 @@ def test_ui_settings_only_contains_overlay_entries():
     cfg = {**DEFAULTS, "goal_api_key": "secret", "right": 5}
     assert "goal_api_key" not in ui_settings(cfg)
     assert ui_settings(cfg)["right"] == 5
+
+
+def test_ui_settings_keeps_language_only_when_set():
+    from overlay.config import DEFAULTS, ui_settings
+    assert "language" not in DEFAULTS
+    assert "language" not in ui_settings(dict(DEFAULTS))
+    assert ui_settings({**DEFAULTS, "language": "en"})["language"] == "en"
