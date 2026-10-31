@@ -156,3 +156,32 @@ def test_popup_guard_releases_on_error():
         with guard:
             raise RuntimeError
     assert not guard.active
+
+
+def test_texts_in_english():
+    from overlay import i18n
+    from overlay.model import HALF_TIME
+    from overlay.ui import about_lines, format_next, format_suffix, status_text
+    from overlay.updater import UpdateInfo
+    i18n.set_language("en")
+    kickoff = datetime(2026, 10, 30, 17, 0, tzinfo=timezone.utc)
+    assert status_text(None) == "Not checked yet"
+    assert status_text(UpdateInfo(True, "1.6.0", "offline")) == "v1.6.0 available (last check failed)"
+    assert status_text(UpdateInfo(False, "1.6.0", None)) == "Up to date"
+    assert about_lines("1.6.0", "Up to date")[-1] == "Update: Up to date"
+    assert "License: GPL-3.0-or-later" in about_lines("1.6.0", "x")
+    assert format_suffix(Match("BL", "A", "B", 1, 1, Status.FINISHED, kickoff), kickoff) == "FT"
+    assert format_suffix(Match("BL", "A", "B", 1, 1, Status.LIVE, kickoff, HALF_TIME), kickoff) == "HT"
+    m = Match("DFBF", "Stuttgart Frauen", "SGS Essen Frauen", None, None, Status.SCHEDULED, kickoff)
+    local = kickoff.astimezone()
+    assert format_next(m) == f"Stuttgart Frauen – SGS Essen Frauen · {i18n.short_date(local)} {local:%H:%M}"
+
+
+def test_half_time_in_german():
+    from datetime import timedelta
+    from overlay.model import HALF_TIME
+    from overlay.ui import format_suffix
+    kickoff = datetime(2026, 10, 30, 17, 0, tzinfo=timezone.utc)
+    assert format_suffix(Match("BL", "A", "B", 1, 1, Status.LIVE, kickoff, HALF_TIME), kickoff) == "HZ"
+    estimated = Match("BL", "A", "B", 1, 1, Status.LIVE, kickoff)
+    assert format_suffix(estimated, kickoff + timedelta(minutes=50)) == "HZ"

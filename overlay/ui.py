@@ -12,11 +12,12 @@ from tkinter import messagebox
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from overlay import __version__, config, single_instance, updater
+from overlay import __version__, config, i18n, single_instance, updater
+from overlay.i18n import t
 from overlay.sound import play_goal_sound
 from overlay.goals import GoalTracker
 from overlay.minute import estimate_minute
-from overlay.model import Match, Status
+from overlay.model import HALF_TIME, Match, Status
 from overlay.selection import SLOW_INTERVAL, is_focus, next_interval, next_matches
 from overlay.service import ScoreService, default_fetchers, goal_api_live_fetch
 
@@ -32,7 +33,6 @@ FLASH_SECONDS = 10
 FLASH_MS = 400
 TOPMOST_EVERY_MS = 5000
 POLL_MS = 500
-WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 MUTEX_NAME = "score-overlay-single-instance"
 REPO_URL = "https://codeberg.org/ElvonMF/score-overlay"
 LICENSE_NAME = "GPL-3.0-or-later"
@@ -42,13 +42,13 @@ UPDATE_CHECK_EVERY = 24 * 3600   # seconds
 
 def status_text(info: "updater.UpdateInfo | None") -> str:
     if info is None:
-        return "Noch nicht geprüft"
+        return t("status_unchecked")
     if info.available:
-        suffix = " (letzte Prüfung fehlgeschlagen)" if info.error else ""
-        return f"v{info.version} verfügbar{suffix}"
+        suffix = t("status_last_failed") if info.error else ""
+        return t("status_available", version=info.version) + suffix
     if info.error:
-        return "Prüfung fehlgeschlagen"
-    return "Aktuell"
+        return t("status_failed")
+    return t("status_current")
 
 
 def restart_command(executable: str, start: Path) -> tuple[list[str], dict]:
@@ -63,13 +63,13 @@ def restart_command(executable: str, start: Path) -> tuple[list[str], dict]:
 def about_lines(version: str, status: str) -> list[str]:
     return [
         "Score-Overlay",
-        f"Version {version}",
-        f"Lizenz: {LICENSE_NAME}",
+        t("about_version", version=version),
+        t("about_license", license=LICENSE_NAME),
         "Copyright (C) 2026 ElvonMF",
-        "Ohne jede Gewährleistung – siehe LICENSE",
+        t("about_warranty"),
         REPO_URL,
-        "Daten: OpenLigaDB, ESPN, TheSportsDB, optional goal-api.com",
-        f"Update: {status}",
+        t("about_data"),
+        t("about_update", status=status),
     ]
 
 
@@ -81,7 +81,7 @@ def _virtual_desktop() -> tuple[int, int, int, int]:
 
 def format_next(m: Match) -> str:
     local = m.kickoff.astimezone()
-    return f"{m.home} – {m.away} · {WEEKDAYS[local.weekday()]} {local:%d.%m. %H:%M}"
+    return f"{m.home} – {m.away} · {i18n.short_date(local)} {local:%H:%M}"
 
 
 def _key(m: Match) -> tuple:
@@ -102,9 +102,10 @@ def is_overdue(m: Match, now: datetime) -> bool:
 
 def format_suffix(m: Match, now: datetime) -> str:
     if m.status is Status.LIVE:
-        return m.minute or estimate_minute(m.kickoff, now)
+        minute = m.minute or estimate_minute(m.kickoff, now)
+        return t("half_time") if minute == HALF_TIME else minute
     if m.status is Status.FINISHED:
-        return "Ende"
+        return t("finished")
     time = m.kickoff.astimezone().strftime("%H:%M")
     return time + "?" if is_overdue(m, now) else time
 
