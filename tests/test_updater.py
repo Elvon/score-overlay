@@ -230,6 +230,18 @@ def test_only_one_install_at_a_time(tmp_path):
     assert snapshot(app) == before
 
 
+
+def test_error_messages_follow_language(tmp_path):
+    from overlay import i18n
+    i18n.set_language("en")
+    app = make_app(tmp_path / "app")
+    assert updater._install_lock.acquire(blocking=False)
+    try:
+        with pytest.raises(UpdateError, match="^An update is already running$"):
+            install(make_zip(tmp_path, NEW), app, "1.6.0")
+    finally:
+        updater._install_lock.release()
+
 def test_temp_dirs_ignore_cleanup_errors(tmp_path, monkeypatch):
     seen = []
     real = updater.tempfile.TemporaryDirectory

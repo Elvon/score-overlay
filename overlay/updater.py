@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
 
+from overlay.i18n import t
 from overlay.sources.http import get_json
 from overlay.version import is_newer, parse_version
 
@@ -82,14 +83,14 @@ def download(version: str, dest: Path, opener=urllib.request.urlopen) -> Path:
         with opener(ARCHIVE_URL.format(version=version), timeout=DOWNLOAD_TIMEOUT) as resp:
             final_url = resp.geturl()
             if not _trusted(final_url):
-                raise UpdateError(f"Download wurde auf eine unerwartete Adresse umgeleitet: {final_url}")
+                raise UpdateError(t("err_redirect", url=final_url))
             path.write_bytes(resp.read())
     except UpdateError:
         raise
     except Exception as exc:
-        raise UpdateError(f"Download fehlgeschlagen: {exc}") from exc
+        raise UpdateError(t("err_download", error=exc)) from exc
     if not zipfile.is_zipfile(path):
-        raise UpdateError("Download ist kein ZIP-Archiv")
+        raise UpdateError(t("err_not_zip"))
     return path
 
 
@@ -97,20 +98,20 @@ def _safe_members(z: zipfile.ZipFile) -> None:
     for name in z.namelist():
         parts = PurePosixPath(name).parts
         if name.startswith(("/", "\\")) or ".." in parts or (parts and ":" in parts[0]):
-            raise UpdateError(f"Unzulässiger Pfad im Archiv: {name}")
+            raise UpdateError(t("err_bad_path", name=name))
 
 
 def _release_root(extracted: Path, expected_version: str) -> Path:
     starts = sorted(extracted.rglob("start.pyw"), key=lambda p: len(p.parts))
     if not starts:
-        raise UpdateError("Archiv enthält kein start.pyw")
+        raise UpdateError(t("err_no_start"))
     root = starts[0].parent
     init = root / "overlay" / "__init__.py"
     if not init.is_file():
-        raise UpdateError("Archiv enthält kein overlay/__init__.py")
+        raise UpdateError(t("err_no_init"))
     match = re.search(r'__version__\s*=\s*"([^"]+)"', init.read_text(encoding="utf-8"))
     if not match or match.group(1) != expected_version:
-        raise UpdateError(f"Archiv enthält nicht Version {expected_version}")
+        raise UpdateError(t("err_wrong_version", version=expected_version))
     return root
 
 
@@ -161,9 +162,9 @@ def install(zip_path: Path, app_dir: Path, expected_version: str) -> None:
     alone. Replaced entries are moved to .update-backup/ and moved back if anything fails.
     """
     if is_git_checkout(app_dir):
-        raise UpdateError("Git-Ordner: bitte per git pull aktualisieren")
+        raise UpdateError(t("err_git"))
     if not _install_lock.acquire(blocking=False):
-        raise UpdateError("Ein Update läuft bereits")
+        raise UpdateError(t("err_running"))
     try:
         _install(zip_path, app_dir, expected_version)
     finally:
@@ -178,7 +179,7 @@ def _install(zip_path: Path, app_dir: Path, expected_version: str) -> None:
                 _safe_members(z)
                 z.extractall(extracted)
         except zipfile.BadZipFile as exc:
-            raise UpdateError("Archiv ist beschädigt") from exc
+            raise UpdateError(t("err_corrupt")) from exc
         root = _release_root(extracted, expected_version)
         names = sorted(p.name for p in root.iterdir() if p.name not in PRESERVED)
 
@@ -187,7 +188,7 @@ def _install(zip_path: Path, app_dir: Path, expected_version: str) -> None:
             _remove(backup)
             backup.mkdir()
         except OSError as exc:
-            raise UpdateError(f"Kann {backup} nicht anlegen (Schreibrechte? Ordner löschen?): {exc}") from exc
+            raise UpdateError(t("err_backup", path=backup, error=exc)) from exc
 
         moved: list[str] = []
         started: list[str] = []
@@ -202,10 +203,8 @@ def _install(zip_path: Path, app_dir: Path, expected_version: str) -> None:
         except Exception as exc:
             problems = _rollback(app_dir, backup, started, moved)
             if problems:
-                raise UpdateError(
-                    f"Installation fehlgeschlagen ({exc}). Nicht wiederhergestellt: {', '.join(problems)}. "
-                    f"Der alte Stand liegt in {backup} - bitte von dort zurückkopieren.") from exc
-            raise UpdateError(f"Installation fehlgeschlagen, alter Stand wiederhergestellt: {exc}") from exc
+                raise UpdateError(t("err_partial", error=exc, names=", ".join(problems), path=backup)) from exc
+            raise UpdateError(t("err_rolled_back", error=exc)) from exc
 
 
 def download_and_install(version: str, app_dir: Path, opener=urllib.request.urlopen) -> None:
