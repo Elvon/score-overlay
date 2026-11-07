@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import pytest
+from dataclasses import replace
 from datetime import datetime, timedelta
 
-from overlay.model import Match, Status
-from overlay.service import ScoreService
+from overlay.model import Goal, Match, Status
+from overlay.service import GOALS_RETRIES, ScoreService
 
 NOW = datetime(2026, 10, 11, 12, 0).astimezone()
 BL = Match("BL", "A", "B", 0, 0, Status.LIVE, NOW - timedelta(hours=1))
@@ -234,3 +235,80 @@ def test_throttled_fetch_does_not_retry_failures_within_interval():
     with pytest.raises(OSError):
         fetch(NOW + timedelta(hours=1))
     assert len(calls) == 2
+
+
+def ga_live(home_goals, away_goals):
+    return Match("BL", "Köln", "Schalke 04", home_goals, away_goals, Status.LIVE,
+                 NOW - timedelta(minutes=30), "30'", ref="f1")
+
+
+class GoalsSource:
+    def __init__(self, *goals):
+        self.goals = goals
+        self.calls = []
+
+    def __call__(self, ref):
+        self.calls.append(ref)
+        if isinstance(self.goals, Exception):
+            raise self.goals
+        return self.goals
+
+
+G1 = Goal("12'", "M. Muheim", True)
+G2 = Goal("40'", "J. Scally", True)
+
+
+def goal_service(live, goals):
+    return ScoreService({"bl1": lambda now: [OLDB_TODAY]}, live_fetch=live, goals_fetch=goals)
+
+
+def test_goal_details_fetched_once_per_score():
+    live, goals = LiveSource([ga_live(1, 0)]), GoalsSource(G1)
+    service = goal_service(live, goals)
+    assert service.refresh(NOW)[0].goals == (G1,)
+    assert service.refresh(NOW + timedelta(minutes=1))[0].goals == (G1,)
+    assert goals.calls == ["f1"]
+    live.result, goals.goals = [ga_live(2, 0)], (G1, G2)
+    assert service.refresh(NOW + timedelta(minutes=2))[0].goals == (G1, G2)
+    assert goals.calls == ["f1", "f1"]
+
+
+def test_no_goal_details_for_goalless_match():
+    goals = GoalsSource()
+    goal_service(LiveSource([ga_live(0, 0)]), goals).refresh(NOW)
+    assert goals.calls == []
+
+
+def test_goal_details_failure_keeps_old_goals():
+    live, goals = LiveSource([ga_live(1, 0)]), GoalsSource(G1)
+    service = goal_service(live, goals)
+    service.refresh(NOW)
+    live.result, goals.goals = [ga_live(2, 0)], OSError("down")
+    assert service.refresh(NOW + timedelta(minutes=1))[0].goals == (G1,)
+    goals.goals = (G1, G2)
+    assert service.refresh(NOW + timedelta(minutes=2))[0].goals == (G1, G2)
+    assert len(goals.calls) == 3
+
+
+def test_goal_details_retry_limited_when_incomplete():
+    live, goals = LiveSource([ga_live(2, 0)]), GoalsSource(G1)
+    service = goal_service(live, goals)
+    for minute in range(10):
+        assert service.refresh(NOW + timedelta(minutes=minute))[0].goals == (G1,)
+    assert len(goals.calls) == GOALS_RETRIES
+
+
+def test_goal_details_without_goals_fetch():
+    service = ScoreService({"bl1": lambda now: [OLDB_TODAY]}, live_fetch=LiveSource([ga_live(1, 0)]))
+    assert service.refresh(NOW)[0].goals == ()
+
+
+def test_goal_details_dropped_after_the_matchday():
+    live, goals = LiveSource([ga_live(1, 0)]), GoalsSource(G1)
+    service = goal_service(live, goals)
+    service.refresh(NOW)
+    assert service.goal_details
+    service.live["BL"] = [replace(ga_live(1, 0), status=Status.FINISHED)]
+    service.fetchers = {"bl1": lambda now: [OLDB_NEXT_WEEK]}
+    service.refresh(NOW + timedelta(days=1))
+    assert service.goal_details == {}

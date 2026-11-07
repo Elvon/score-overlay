@@ -1,21 +1,24 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Fetches all sources, isolating failures and caching the last good result."""
 import logging
+from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Callable
 
-from overlay.model import Match, Status
+from overlay.model import Goal, Match, Status
 from overlay.selection import DEFAULT_LEAGUES, SLOW_INTERVAL, is_hot, select
 from overlay.sources import espn, goalapi, openligadb, thesportsdb
 
 Fetcher = Callable[[datetime], list[Match]]
 LiveFetcher = Callable[[str, datetime], list[Match]]  # (competition, now) -> today's matches
+GoalsFetcher = Callable[[str], tuple[Goal, ...]]  # goal-api fixture id -> its goals
 
 LIVE_COMPETITIONS = ("BL", "DFB", "DFBF", "FBL", "RLB")
 TEAM_SCHEDULE_EVERY = timedelta(hours=1)
 LIVE_FAST = timedelta(minutes=1)    # while a match of the competition is live
 LIVE_SLOW = timedelta(minutes=30)   # matches today, none live
 LIVE_GIVE_UP = timedelta(minutes=5)  # then fall back to the regular sources
+GOALS_RETRIES = 5  # goal requests per score while goal-api.com lists fewer goals than the score
 log = logging.getLogger(__name__)
 
 
@@ -59,13 +62,17 @@ def goal_api_live_fetch(key: str) -> LiveFetcher:
     return lambda comp, now: goalapi.fetch(comp, now.astimezone().date(), key)
 
 
+def goal_api_goals_fetch(key: str) -> GoalsFetcher:
+    return lambda ref: goalapi.fetch_goals(ref, key)
+
+
 def _today(m: Match, now: datetime) -> bool:
     return m.kickoff.astimezone().date() == now.astimezone().date()
 
 
 class ScoreService:
     def __init__(self, fetchers: dict[str, Fetcher] | None = None,
-                 live_fetch: LiveFetcher | None = None):
+                 live_fetch: LiveFetcher | None = None, goals_fetch: GoalsFetcher | None = None):
         self.fetchers = fetchers if fetchers is not None else default_fetchers()
         self.cache: dict[str, list[Match]] = {}
         self.last_fetch: dict[str, datetime] = {}
@@ -79,6 +86,9 @@ class ScoreService:
         self.live_tried: dict[str, datetime] = {}
         self.live_ok: dict[str, datetime] = {}
         self.live_failed: set[str] = set()
+        # goal-api.com goals per fixture id: (score total, goals, requests for that total).
+        self.goals_fetch = goals_fetch
+        self.goal_details: dict[str, tuple[int, tuple[Goal, ...], int]] = {}
 
     def _due(self, key: str, now: datetime) -> bool:
         last = self.last_fetch.get(key)
@@ -101,6 +111,32 @@ class ScoreService:
                     if not (m.competition in self.live and _today(m, self._now))]
         return live + replaced
 
+    def _drop_live(self, comp: str) -> None:
+        for m in self.live.pop(comp, None) or []:
+            self.goal_details.pop(m.ref, None)
+
+    def _with_goals(self, matches: list[Match]) -> list[Match]:
+        """Attaches goal-api.com goals, asking again only when the score changed."""
+        if self.goals_fetch is None:
+            return matches
+        result = []
+        for m in matches:
+            total = (m.home_goals or 0) + (m.away_goals or 0)
+            if m.ref is None or total == 0:
+                result.append(m)
+                continue
+            known, goals, tries = self.goal_details.get(m.ref, (None, (), 0))
+            if known != total:
+                tries = 0
+            if known != total or (len(goals) < total and tries < GOALS_RETRIES):
+                try:
+                    goals = self.goals_fetch(m.ref)
+                    self.goal_details[m.ref] = (total, goals, tries + 1)
+                except Exception:
+                    log.warning("goals for %s failed", m.ref, exc_info=True)
+            result.append(replace(m, goals=goals))
+        return result
+
     def _refresh_live(self, now: datetime) -> None:
         base = self._base_matches()
         for comp in LIVE_COMPETITIONS:
@@ -110,7 +146,7 @@ class ScoreService:
 
             cached = self.live.get(comp)
             if not todays(base) and not todays(cached or []):
-                self.live.pop(comp, None)  # matchday over
+                self._drop_live(comp)  # matchday over
                 continue
             # Once goal-api answered, trust its view of what is live.
             current = todays(cached) if cached is not None else todays(base)
@@ -120,7 +156,7 @@ class ScoreService:
                 continue
             self.live_tried[comp] = now
             try:
-                self.live[comp] = self.live_fetch(comp, now)
+                self.live[comp] = self._with_goals(self.live_fetch(comp, now))
                 self.live_ok[comp] = now
                 self.live_failed.discard(comp)
             except Exception:
@@ -128,7 +164,7 @@ class ScoreService:
                 self.live_failed.add(comp)
                 ok = self.live_ok.get(comp)
                 if ok is None or now - ok > LIVE_GIVE_UP:
-                    self.live.pop(comp, None)
+                    self._drop_live(comp)
                     self.live_failed.discard(comp)
 
     def refresh(self, now: datetime) -> list[Match]:

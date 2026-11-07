@@ -19,7 +19,7 @@ from overlay.goals import GoalTracker
 from overlay.minute import estimate_minute
 from overlay.model import HALF_TIME, Match, Status
 from overlay.selection import SLOW_INTERVAL, is_focus, next_interval, next_matches
-from overlay.service import ScoreService, default_fetchers, goal_api_live_fetch
+from overlay.service import ScoreService, default_fetchers, goal_api_goals_fetch, goal_api_live_fetch
 
 BG = "#111111"
 FG = "#ffffff"
@@ -143,7 +143,8 @@ class Overlay:
         i18n.set_language(i18n.resolve(self.cfg.get("language")))
         key = self.cfg.get("goal_api_key")
         self.service = ScoreService(fetchers=default_fetchers(key),
-                                    live_fetch=goal_api_live_fetch(key) if key else None)
+                                    live_fetch=goal_api_live_fetch(key) if key else None,
+                                    goals_fetch=goal_api_goals_fetch(key) if key else None)
         self.service.leagues = config.leagues(self.cfg)
         self.goals = GoalTracker()
         self.results: queue.Queue = queue.Queue()
