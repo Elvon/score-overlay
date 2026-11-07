@@ -2,7 +2,7 @@
 """goal-api.com (needs a free API key): reliable live scores for today's matches."""
 from datetime import date, datetime
 
-from overlay.model import HALF_TIME, Match, Status
+from overlay.model import HALF_TIME, Goal, Match, Status
 from overlay.sources.http import get_json
 
 BASE = "https://api.goal-api.com/v1"
@@ -24,6 +24,7 @@ COMPETITIONS_BY_NAME = {
     "Regionalliga": "RLB",
 }
 LIVE_PERIODS = {"FIRST_HALF", "SECOND_HALF", "EXTRA_TIME", "PENALTIES"}
+OWN_GOAL = " (o.g.)"
 
 
 def _goals(value) -> int | None:
@@ -62,8 +63,33 @@ def parse(fixtures: list[dict], competition: str) -> list[Match]:
             status=status,
             kickoff=datetime.fromisoformat(f["kickoffUtc"].replace("Z", "+00:00")),
             minute=minute,
+            ref=f.get("id"),
         ))
     return matches
+
+
+def parse_goals(events: list[dict]) -> tuple[Goal, ...]:
+    """Goals from a fixture's events, in match order (events without timeNum last)."""
+    goals = [e for e in events if e.get("type") == "GOAL"]
+    goals.sort(key=lambda e: (e.get("timeNum") is None, e.get("timeNum") or 0))
+    result = []
+    for e in goals:
+        home = e.get("homeScorer") is not None
+        name = (e.get("homeScorer") if home else e.get("awayScorer")) or ""
+        own_goal = name.endswith(OWN_GOAL)
+        result.append(Goal(
+            minute=f"{e['time']}'" if e.get("time") else "",
+            scorer=name.removesuffix(OWN_GOAL) or "?",
+            home=home,
+            penalty=e.get("info") == "Penalty",
+            own_goal=own_goal,
+        ))
+    return tuple(result)
+
+
+def fetch_goals(fixture_id: str, key: str) -> tuple[Goal, ...]:
+    data = get_json(f"{BASE}/fixtures/{fixture_id}/events", headers={"Authorization": f"Bearer {key}"})
+    return parse_goals(data["data"] if isinstance(data, dict) else data)
 
 
 def fetch(competition: str, day: date, key: str) -> list[Match]:

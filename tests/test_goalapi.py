@@ -3,8 +3,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from overlay.model import HALF_TIME, Status
-from overlay.sources.goalapi import parse
+from overlay.model import HALF_TIME, Goal, Status
+from overlay.sources.goalapi import parse, parse_goals
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -74,3 +74,17 @@ def test_parse_team_schedule_includes_womens_cup():
     assert (cup.competition, cup.home, cup.away, cup.status) == (
         "DFBF", "Stuttgart Frauen", "SGS Essen Frauen", Status.SCHEDULED)
     assert {m.competition for m in matches} <= {"DFBF", "FBL"}
+
+
+def test_parse_sets_goal_api_ref():
+    m = by_home(parse(load("goalapi_bl_20261024.json"), "BL"), "Mainz 05")
+    assert m.ref == "cmu74fmmbnubzqu07zqwaoey7"
+
+
+def test_parse_goals_from_events():
+    events = json.loads((FIX / "goalapi_events.json").read_text(encoding="utf-8"))
+    assert parse_goals(events) == (
+        Goal("10'", "W. Omari", True, own_goal=True),
+        Goal("14'", "T. Moffi", False),
+        Goal("37'", "A. Nusa", False, penalty=True),
+        Goal("45+2'", "?", True))
