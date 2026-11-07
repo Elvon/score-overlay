@@ -7,6 +7,7 @@ import sys
 import threading
 import time
 import tkinter as tk
+import urllib.parse
 import webbrowser
 from tkinter import messagebox
 from datetime import datetime, timedelta, timezone
@@ -33,6 +34,8 @@ FLASH_SECONDS = {"for": 10, "against": 10, "other": 4}
 FLASH_MS = 400
 TOPMOST_EVERY_MS = 5000
 POLL_MS = 500
+CLICK_SLOP = 4  # pixels the mouse may move for a press to count as a click, not a drag
+SEARCH_URL = "https://www.google.com/search?q="
 TOOLTIP_HIDE_MS = 80  # moving between the cells of a row must not close the tooltip
 MUTEX_NAME = "score-overlay-single-instance"
 REPO_URL = "https://codeberg.org/ElvonMF/score-overlay"
@@ -116,6 +119,14 @@ def tooltip_position(x: int, y: int, width: int, height: int,
             min(max(y + 16, dy), dy + dh - height))
 
 
+def search_url(m: Match) -> str:
+    return SEARCH_URL + urllib.parse.quote_plus(f"{m.home} {m.away}")
+
+
+def is_click(dx: int, dy: int) -> bool:
+    return abs(dx) <= CLICK_SLOP and abs(dy) <= CLICK_SLOP
+
+
 def wants_sound(goals: dict[Match, str]) -> bool:
     """Only goals in matches of your teams make a sound."""
     return any(kind in ("for", "against") for kind in goals.values())
@@ -179,6 +190,7 @@ class Overlay:
         self.flash_on = False
         self.last_render: tuple | None = None
         self.row_matches: dict[tuple, Match] = {}
+        self.cell_rows: dict[tk.Widget, tuple] = {}
         self.tooltip: tk.Toplevel | None = None
         self.tooltip_label: tk.Label | None = None
         self.tooltip_key: tuple | None = None
@@ -298,6 +310,7 @@ class Overlay:
             w.destroy()
         self.row_labels = {}
         self.row_matches = {}
+        self.cell_rows = {}
         for row, m in enumerate(matches):
             weight = "bold" if is_focus(m) else "normal"
             is_stale = m in stale
@@ -312,6 +325,7 @@ class Overlay:
                 label.bind("<Enter>", lambda e, key=_key(m): self._show_tooltip(key, e))
                 label.bind("<Leave>", lambda e: self._schedule_hide_tooltip())
                 labels.append(label)
+                self.cell_rows[label] = _key(m)
             self.row_labels[_key(m)] = (labels, color)
             self.row_matches[_key(m)] = m
         self._sync_tooltip()
@@ -517,6 +531,7 @@ class Overlay:
             self._offset = None
             return
         self._offset = (event.x_root - self.root.winfo_x(), event.y_root - self.root.winfo_y())
+        self._press = (event.x_root, event.y_root, self.cell_rows.get(event.widget))
 
     def _drag_move(self, event) -> None:
         if getattr(self, "_offset", None) is None:
@@ -528,6 +543,11 @@ class Overlay:
 
     def _drag_end(self, event) -> None:
         if getattr(self, "_offset", None) is None:
+            return
+        x, y, row = self._press
+        m = self.row_matches.get(row)
+        if m is not None and is_click(event.x_root - x, event.y_root - y):
+            webbrowser.open(search_url(m))  # a click on a match, not a drag
             return
         self.cfg["right"] = self.root.winfo_x() + self.root.winfo_width()
         self.cfg["y"] = self.root.winfo_y()

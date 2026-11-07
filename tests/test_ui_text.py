@@ -283,3 +283,88 @@ def test_redraw_updates_tooltip_of_shown_match():
     o.row_matches = {("k",): m}
     o._sync_tooltip()
     assert o.popup.depth == 1 and "3'  1:0  Z" in o.tooltip_label.text
+
+
+def test_search_url():
+    from overlay import ui
+    m = Match("BL", "FC Bayern München", "VfB Stuttgart", None, None, Status.SCHEDULED, TIP_KICK)
+    assert ui.search_url(m) == "https://www.google.com/search?q=FC+Bayern+M%C3%BCnchen+VfB+Stuttgart"
+
+
+def test_is_click():
+    from overlay import ui
+    assert ui.is_click(4, -4) and ui.is_click(0, 0)
+    assert not ui.is_click(5, 0) and not ui.is_click(0, -5)
+
+
+class FakeRoot:
+    def winfo_x(self):
+        return 100
+
+    def winfo_y(self):
+        return 50
+
+    def winfo_width(self):
+        return 300
+
+    def geometry(self, spec):
+        pass
+
+
+class FakeWidget:
+    def __init__(self, toplevel):
+        self.toplevel = toplevel
+
+    def winfo_toplevel(self):
+        return self.toplevel
+
+
+def click_overlay(monkeypatch):
+    from overlay import ui
+    o = ui.Overlay.__new__(ui.Overlay)
+    o.root, o.cfg, o.config_path = FakeRoot(), {}, None
+    o.tooltip, o._tooltip_after = None, None
+    o.match = Match("BL", "A", "B", 1, 0, Status.LIVE, TIP_KICK)
+    o.cell = FakeWidget(o.root)
+    o.cell_rows = {o.cell: ("k",)}
+    o.row_matches = {("k",): o.match}
+    o.opened, o.saved = [], []
+    monkeypatch.setattr(ui.webbrowser, "open", o.opened.append)
+    monkeypatch.setattr(ui.config, "save", lambda path, values: o.saved.append(values))
+    return o
+
+
+def event(widget, x, y):
+    return type("E", (), {"widget": widget, "x_root": x, "y_root": y})()
+
+
+def test_click_on_row_opens_search_and_keeps_position(monkeypatch):
+    from overlay import ui
+    o = click_overlay(monkeypatch)
+    o._drag_start(event(o.cell, 200, 80))
+    o._drag_end(event(o.cell, 202, 79))
+    assert (o.opened, o.saved) == ([ui.search_url(o.match)], [])
+
+
+def test_drag_over_row_moves_window_without_search(monkeypatch):
+    o = click_overlay(monkeypatch)
+    o._drag_start(event(o.cell, 200, 80))
+    o._drag_move(event(o.cell, 230, 80))
+    o._drag_end(event(o.cell, 230, 80))
+    assert o.opened == [] and len(o.saved) == 1
+
+
+def test_click_outside_rows_opens_nothing(monkeypatch):
+    o = click_overlay(monkeypatch)
+    clock = FakeWidget(o.root)
+    o._drag_start(event(clock, 200, 80))
+    o._drag_end(event(clock, 200, 80))
+    assert o.opened == [] and len(o.saved) == 1
+
+
+def test_click_in_about_window_opens_nothing(monkeypatch):
+    o = click_overlay(monkeypatch)
+    about_label = FakeWidget(object())
+    o._drag_start(event(about_label, 200, 80))
+    o._drag_end(event(about_label, 200, 80))
+    assert (o.opened, o.saved) == ([], [])
