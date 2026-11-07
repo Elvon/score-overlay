@@ -270,7 +270,7 @@ class Overlay:
                 upcoming = next_matches(self.service.all_matches(), matches, now)
                 goals = self.goals.update(matches)
                 stale = self.service.stale_matches()
-                interval = next_interval(matches, now)
+                interval = self.service.wait(next_interval(matches, now))
             except Exception:
                 matches, interval = None, SLOW_INTERVAL
             if matches is not None:

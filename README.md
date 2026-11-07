@@ -84,11 +84,12 @@ The goal scorers of these matches cost one more request per goal. Add to `config
 
 Requests are only made when a competition plays today: every minute while a match is live, otherwise every 30 minutes.
 If goal-api.com fails for more than 5 minutes (or the daily limit is reached), the other sources take over.
+If OpenLigaDB has not answered since the start, today's matches come from goal-api.com alone.
 `config.json` is not part of the repository; when saving, the overlay only changes its own entries.
 
 Known gaps: women's DFB-Pokal without a goal-api.com key, women's Champions League, Toto-Pokal. Live scores of 1860 may be delayed.
 Women's DFB-Pokal: goal-api.com does not provide live scores for every match; such matches show as `HH:MM?` after kickoff.
-Errors while fetching are logged to `overlay.log`.
+Errors while fetching are logged to `overlay.log`; a source that has not answered since the start is retried every minute.
 
 ## Note on data sources
 

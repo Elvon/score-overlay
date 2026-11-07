@@ -84,11 +84,12 @@ Die Torschützen dieser Spiele kosten eine weitere Abfrage pro Tor. In `config.j
 
 Abgefragt wird nur, wenn ein Wettbewerb heute spielt: jede Minute, solange ein Spiel läuft, sonst alle 30 Minuten.
 Fällt goal-api.com länger als 5 Minuten aus (oder ist das Tageslimit erreicht), springen die anderen Quellen ein.
+Hat OpenLigaDB seit dem Start noch nicht geantwortet, kommen die heutigen Spiele allein von goal-api.com.
 `config.json` ist nicht im Repository; das Overlay ändert beim Speichern nur seine eigenen Einträge.
 
 Bekannte Lücken: DFB-Pokal der Frauen ohne goal-api.com-Key, Champions League der Frauen, Toto-Pokal. Live-Stände von 1860 können verzögert sein.
 DFB-Pokal der Frauen: goal-api.com liefert nicht für jedes Spiel Live-Stände; solche Spiele erscheinen nach Anpfiff als `HH:MM?`.
-Fehler beim Abruf werden in `overlay.log` protokolliert.
+Fehler beim Abruf werden in `overlay.log` protokolliert; eine Quelle, die seit dem Start noch nicht geantwortet hat, wird jede Minute neu abgefragt.
 
 ## Hinweis zu Datenquellen
 

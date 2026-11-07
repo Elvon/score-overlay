@@ -4,7 +4,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta
 
 from overlay.model import Goal, Match, Status
-from overlay.service import GOALS_RETRIES, ScoreService
+from overlay.service import GOALS_RETRIES, RETRY_SECONDS, ScoreService
 
 NOW = datetime(2026, 10, 11, 12, 0).astimezone()
 BL = Match("BL", "A", "B", 0, 0, Status.LIVE, NOW - timedelta(hours=1))
@@ -321,3 +321,48 @@ def test_goal_details_failures_count_towards_retries():
     for minute in range(10):
         service.refresh(NOW + timedelta(minutes=minute))
     assert len(goals.calls) == GOALS_RETRIES
+
+
+def test_source_without_any_answer_retried_after_a_minute():
+    calls = []
+
+    def down(now):
+        calls.append(now)
+        raise TimeoutError("read timed out")
+
+    service = ScoreService({"bl1": down})
+    for seconds in (0, 30, 60):
+        service.refresh(NOW + timedelta(seconds=seconds))
+    assert len(calls) == 2
+    assert service.wait(600) == RETRY_SECONDS
+
+
+def test_source_with_cache_keeps_slow_retry():
+    calls = []
+
+    def flaky(now):
+        calls.append(now)
+        if len(calls) > 1:
+            raise TimeoutError("read timed out")
+        return [OLDB_NEXT_WEEK]
+
+    service = ScoreService({"bl1": flaky})
+    for seconds in (0, 600, 660):
+        service.refresh(NOW + timedelta(seconds=seconds))
+    assert len(calls) == 2
+    assert service.wait(600) == 600
+
+
+def test_goal_api_asked_while_openligadb_never_answered():
+    live = LiveSource([GA_TODAY])
+    service = ScoreService({"bl1": failing}, live_fetch=live)
+    assert service.refresh(NOW) == [GA_TODAY]
+    assert [c for c, _ in live.calls] == ["BL"]
+
+
+def test_goal_api_probe_without_matches_repeats_every_30_minutes():
+    live = LiveSource([])
+    service = ScoreService({"bl1": failing}, live_fetch=live)
+    for minutes in (0, 10, 30):
+        service.refresh(NOW + timedelta(minutes=minutes))
+    assert [c for c, _ in live.calls] == ["BL", "BL"]

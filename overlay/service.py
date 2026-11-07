@@ -14,6 +14,9 @@ LiveFetcher = Callable[[str, datetime], list[Match]]  # (competition, now) -> to
 GoalsFetcher = Callable[[str], tuple[Goal, ...]]  # goal-api fixture id -> its goals
 
 LIVE_COMPETITIONS = ("BL", "DFB", "DFBF", "FBL", "RLB")
+# Regular source of each live competition: while it has never answered, goal-api.com is asked anyway.
+LIVE_SOURCES = {"BL": "bl1", "DFB": "dfb", "FBL": "ffb1"}
+RETRY_SECONDS = 60  # retry interval for a source that has not answered once since the start
 TEAM_SCHEDULE_EVERY = timedelta(hours=1)
 LIVE_FAST = timedelta(minutes=1)    # while a match of the competition is live
 LIVE_SLOW = timedelta(minutes=30)   # matches today, none live
@@ -90,10 +93,21 @@ class ScoreService:
         self.goals_fetch = goals_fetch
         self.goal_details: dict[str, tuple[int, tuple[Goal, ...], int]] = {}
 
+    def _never_answered(self, key: str | None) -> bool:
+        return key in self.failed and key not in self.cache
+
+    def wait(self, interval: int) -> int:
+        """Seconds until the next refresh; short while a source has not answered once."""
+        if any(self._never_answered(key) for key in self.fetchers):
+            return min(interval, RETRY_SECONDS)
+        return interval
+
     def _due(self, key: str, now: datetime) -> bool:
         last = self.last_fetch.get(key)
         if last is None or now - last >= timedelta(seconds=SLOW_INTERVAL):
             return True
+        if self._never_answered(key):
+            return now - last >= timedelta(seconds=RETRY_SECONDS)
         # Fast cycle: only sources with a live/imminent match currently on screen.
         return any(m in self.shown and is_hot(m, now) for m in self.cache.get(key, []))
 
@@ -146,7 +160,8 @@ class ScoreService:
                         if m.competition == comp and (_today(m, now) or m.status is Status.LIVE)]
 
             cached = self.live.get(comp)
-            if not todays(base) and not todays(cached or []):
+            unknown = self._never_answered(LIVE_SOURCES.get(comp))  # e.g. OpenLigaDB down since the start
+            if not todays(base) and not todays(cached or []) and not unknown:
                 self._drop_live(comp)  # matchday over
                 continue
             # Once goal-api answered, trust its view of what is live.
