@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Detects new goals in focus-team matches between two refreshes."""
+"""Detects new goals between two refreshes."""
 from overlay.model import Match
 from overlay.selection import team_of
 
@@ -15,7 +15,8 @@ class GoalTracker:
         self.scores: dict[Key, tuple[int, int]] | None = None
 
     def update(self, matches: list[Match]) -> dict[Match, str]:
-        """Returns {match: "for" | "against"} for focus matches whose score went up."""
+        """Returns {match: "for" | "against" | "other"} for matches whose score went up;
+        "other" for matches without a focus team."""
         current = {_key(m): (m.home_goals, m.away_goals) for m in matches
                    if m.home_goals is not None and m.away_goals is not None}
         goals = {}
@@ -31,5 +32,7 @@ class GoalTracker:
                     goals[m] = "for" if home_scored else "against"
                 elif team_of(m.away):
                     goals[m] = "for" if away_scored else "against"
+                else:
+                    goals[m] = "other"
         self.scores = current
         return goals

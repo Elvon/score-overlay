@@ -28,8 +28,8 @@ FONT = "Segoe UI"
 NEXT_FG = "#999999"
 STALE_FG = "#777777"
 OVERDUE_AFTER = timedelta(minutes=10)  # still "scheduled" this long after kickoff: source has no live data
-FLASH = {"for": "#2ecc40", "against": "#ff4136"}
-FLASH_SECONDS = 10
+FLASH = {"for": "#2ecc40", "against": "#ff4136", "other": "#ffdc00"}
+FLASH_SECONDS = {"for": 10, "against": 10, "other": 4}
 FLASH_MS = 400
 TOPMOST_EVERY_MS = 5000
 POLL_MS = 500
@@ -94,6 +94,11 @@ def format_score(m: Match, stale: bool) -> str:
     else:
         score = f"{m.home_goals}:{m.away_goals}"
     return score + "?" if stale else score
+
+
+def wants_sound(goals: dict[Match, str]) -> bool:
+    """Only goals in matches of your teams make a sound."""
+    return any(kind in ("for", "against") for kind in goals.values())
 
 
 def is_overdue(m: Match, now: datetime) -> bool:
@@ -281,10 +286,10 @@ class Overlay:
                 labels.append(label)
             self.row_labels[_key(m)] = (labels, color)
 
-        until = time.monotonic() + FLASH_SECONDS
+        start = time.monotonic()
         for m, kind in goals.items():
-            self.flashing[_key(m)] = (FLASH[kind], until)
-        if goals and self.cfg.get("sound"):
+            self.flashing[_key(m)] = (FLASH[kind], start + FLASH_SECONDS[kind])
+        if wants_sound(goals) and self.cfg.get("sound"):
             play_goal_sound(self.cfg.get("sound_file"))
         self._layout()
         self._place()

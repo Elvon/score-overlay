@@ -29,10 +29,11 @@ def test_goal_against_focus_team_home():
     assert t.update([new]) == {new: "against"}
 
 
-def test_non_focus_goal_ignored():
+def test_goal_in_other_match():
     t = GoalTracker()
-    t.update([m("FC Bayern München", "SC Freiburg", 0, 0, comp="BL")])
-    assert t.update([m("FC Bayern München", "SC Freiburg", 1, 0, comp="BL")]) == {}
+    t.update([m("Mainz 05", "Werder Bremen", 0, 0, comp="BL")])
+    new = m("Mainz 05", "Werder Bremen", 0, 1, comp="BL")
+    assert t.update([new]) == {new: "other"}
 
 
 def test_match_appearing_later_with_score_is_not_a_goal():

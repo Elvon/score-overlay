@@ -185,3 +185,19 @@ def test_half_time_in_german():
     assert format_suffix(Match("BL", "A", "B", 1, 1, Status.LIVE, kickoff, HALF_TIME), kickoff) == "HZ"
     estimated = Match("BL", "A", "B", 1, 1, Status.LIVE, kickoff)
     assert format_suffix(estimated, kickoff + timedelta(minutes=50)) == "HZ"
+
+
+def test_sound_only_for_focus_goals():
+    from overlay import ui
+    kick = datetime(2026, 11, 7, 14, 30, tzinfo=timezone.utc)
+    other = Match("BL", "Mainz 05", "Werder Bremen", 0, 1, Status.LIVE, kick)
+    vfb = Match("BL", "VfB Stuttgart", "SC Freiburg", 1, 0, Status.LIVE, kick)
+    assert not ui.wants_sound({other: "other"})
+    assert ui.wants_sound({other: "other", vfb: "for"})
+    assert ui.wants_sound({vfb: "against"})
+
+
+def test_other_goal_flash_is_short_and_yellow():
+    from overlay import ui
+    assert ui.FLASH["other"] == "#ffdc00"
+    assert ui.FLASH_SECONDS == {"for": 10, "against": 10, "other": 4}
