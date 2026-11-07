@@ -16,6 +16,7 @@ Matches of your teams appear 3 h before kickoff and stay until about 3 h after t
   optionally with a sound. The default is `C:\Windows\Media\tada.wav`; another WAV file can be set
   in `config.json` as `"sound_file"` (double the backslashes, e.g. `"D:\\Sounds\\goal.wav"`).
   The sound plays regardless of the Windows sound scheme.
+- When a goal is scored in another match on screen, its row flashes yellow for ~4 s, without sound.
 - Only one overlay runs at a time; a second start exits right away.
 - If a source reports no match minute (Bundesliga, women, 1860), it is estimated from the kickoff time
   and marked with `~` (e.g. `~67'`, `HT`, `~90+'`).
@@ -33,6 +34,9 @@ Matches of your teams appear 3 h before kickoff and stay until about 3 h after t
 ## Usage
 
 - Left mouse button: move the window (the position is saved in `config.json`)
+- Mouse pointer over a match: its goals with minute, score and scorer (`pen.` = penalty, `o.g.` = own goal).
+  Matches of 1860 (TheSportsDB) come without scorers.
+- Click (without dragging) on a match: Google search for the match in the browser
 - Right mouse button: "Refresh", switches (saved), "Sprache / Language", "About Score-Overlay…", "Quit"
   - "Preview" – next match of each team below the clock
   - "All Bundesliga matches" – on matchdays also the matches without your teams (default: on)
@@ -71,7 +75,8 @@ it only points out the update (`git pull`).
 OpenLigaDB is maintained by volunteers; live scores are sometimes missing there. With a free key from
 [goal-api.com](https://goal-api.com) (1,000 requests/day), today's matches of Bundesliga, DFB-Pokal,
 Frauen-Bundesliga, women's DFB-Pokal and Regionalliga (1860) come from there, with the real match minute.
-In addition, the VfB women's schedule is loaded hourly so that cup matches also appear in the preview. Add to `config.json`:
+In addition, the VfB women's schedule is loaded hourly so that cup matches also appear in the preview.
+The goal scorers of these matches cost one more request per goal. Add to `config.json`:
 
 ```json
 "goal_api_key": "YOUR_KEY"

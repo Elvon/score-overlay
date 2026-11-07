@@ -16,6 +16,7 @@ Spiele deiner Teams erscheinen 3 h vor Anpfiff und bleiben bis ca. 3 h nach Abpf
   optional mit Ton. Standard ist `C:\Windows\Media\tada.wav`; eine andere WAV-Datei lässt sich
   in `config.json` unter `"sound_file"` eintragen (Backslashes doppelt, z.B. `"D:\\Sounds\\tor.wav"`).
   Der Ton spielt unabhängig vom Windows-Soundschema.
+- Fällt in einem anderen angezeigten Spiel ein Tor, blinkt seine Zeile ~4 s gelb, ohne Ton.
 - Es läuft immer nur ein Overlay; ein zweiter Start beendet sich sofort.
 - Liefert eine Quelle keine Spielminute (Bundesliga, Frauen, 1860), wird sie aus der Anstoßzeit
   geschätzt und mit `~` markiert (z.B. `~67'`, `HZ`, `~90+'`).
@@ -33,6 +34,9 @@ Spiele deiner Teams erscheinen 3 h vor Anpfiff und bleiben bis ca. 3 h nach Abpf
 ## Bedienung
 
 - Linke Maustaste: Fenster verschieben (Position wird in `config.json` gespeichert)
+- Mauszeiger über einem Spiel: Tore mit Minute, Stand und Torschütze (`Elfm.` = Elfmeter, `ET` = Eigentor).
+  Spiele von 1860 (TheSportsDB) kommen ohne Torschützen.
+- Klick (ohne Ziehen) auf ein Spiel: Google-Suche nach dem Spiel im Browser
 - Rechte Maustaste: „Aktualisieren“, Schalter (werden gespeichert), „Sprache / Language“, „Über Score-Overlay…“, „Beenden“
   - „Vorschau“ – nächstes Spiel pro Team unter der Uhr
   - „Alle Bundesliga-Spiele“ – an Spieltagen auch die Spiele ohne deine Teams (Standard: an)
@@ -71,7 +75,8 @@ wird nur auf das Update hingewiesen (`git pull`).
 OpenLigaDB wird von Freiwilligen gepflegt; Live-Stände fehlen dort manchmal. Mit einem kostenlosen Key von
 [goal-api.com](https://goal-api.com) (1.000 Abfragen/Tag) kommen die heutigen Spiele von Bundesliga, DFB-Pokal,
 Frauen-Bundesliga, DFB-Pokal der Frauen und Regionalliga (1860) mit echter Spielminute von dort.
-Außerdem wird stündlich der Spielplan der VfB-Frauen geladen, damit auch Pokalspiele in der Vorschau erscheinen. In `config.json` eintragen:
+Außerdem wird stündlich der Spielplan der VfB-Frauen geladen, damit auch Pokalspiele in der Vorschau erscheinen.
+Die Torschützen dieser Spiele kosten eine weitere Abfrage pro Tor. In `config.json` eintragen:
 
 ```json
 "goal_api_key": "DEIN_KEY"
