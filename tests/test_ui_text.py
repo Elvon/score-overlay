@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+import pytest
 from datetime import datetime, timezone
 
 from overlay.model import Goal, Match, Status
@@ -368,3 +369,29 @@ def test_click_in_about_window_opens_nothing(monkeypatch):
     o._drag_start(event(about_label, 200, 80))
     o._drag_end(event(about_label, 200, 80))
     assert (o.opened, o.saved) == ([], [])
+
+
+class PointerRoot:
+    def __init__(self, widget):
+        self.widget = widget
+
+    def winfo_pointerxy(self):
+        return (10, 10)
+
+    def winfo_containing(self, x, y):
+        return self.widget
+
+
+def pointer_overlay(where):
+    o = tooltip_overlay()
+    o.table, o.row_a, o.row_b = object(), object(), object()
+    o.cell_rows = {o.row_a: ("k",), o.row_b: ("other",)}
+    o.root = PointerRoot({"a": o.row_a, "b": o.row_b, "gap": o.table, "away": None}[where])
+    return o
+
+
+@pytest.mark.parametrize("where, kept", [("a", True), ("gap", True), ("b", False), ("away", False)])
+def test_tooltip_closes_when_pointer_is_no_longer_on_its_row(where, kept):
+    o = pointer_overlay(where)
+    o._check_tooltip_pointer()
+    assert (o.tooltip is not None, o.popup.depth) == (kept, 1 if kept else 0)

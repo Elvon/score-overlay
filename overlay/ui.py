@@ -346,6 +346,7 @@ class Overlay:
                 frame.pack(anchor="e", padx=10, pady=pady)
 
     def _flash_tick(self) -> None:
+        self._check_tooltip_pointer()
         self.flash_on = not self.flash_on
         now = time.monotonic()
         for key, (flash_color, until) in list(self.flashing.items()):
@@ -413,6 +414,17 @@ class Overlay:
         self.tooltip.destroy()
         self.tooltip = self.tooltip_label = self.tooltip_key = None
         self.popup.__exit__(None, None, None)
+
+    def _check_tooltip_pointer(self) -> None:
+        """Closes the tooltip once the pointer is off its row. After a redraw Tk may never send
+        <Leave> for the new cells, and an open tooltip keeps the overlay from being raised."""
+        if self.tooltip is None:
+            return
+        widget = self.root.winfo_containing(*self.root.winfo_pointerxy())
+        if widget is self.table:  # gap between two cells of the row
+            return
+        if self.cell_rows.get(widget) != self.tooltip_key:
+            self._hide_tooltip()
 
     def _sync_tooltip(self) -> None:
         """After a redraw: refresh the open tooltip, or close it if its match is gone."""

@@ -68,10 +68,19 @@ def parse(fixtures: list[dict], competition: str) -> list[Match]:
     return matches
 
 
+def _order(event: dict) -> tuple[int, int]:
+    """Match order from "time" ("45+2" -> (45, 2)); timeNum is missing for some goals."""
+    base, _, extra = str(event.get("time") or "").partition("+")
+    try:
+        return int(base), int(extra or 0)
+    except ValueError:
+        num = event.get("timeNum")
+        return (num, 0) if isinstance(num, int) else (999, 0)
+
+
 def parse_goals(events: list[dict]) -> tuple[Goal, ...]:
-    """Goals from a fixture's events, in match order (events without timeNum last)."""
-    goals = [e for e in events if e.get("type") == "GOAL"]
-    goals.sort(key=lambda e: (e.get("timeNum") is None, e.get("timeNum") or 0))
+    """Goals from a fixture's events, in match order."""
+    goals = sorted((e for e in events if e.get("type") == "GOAL"), key=_order)
     result = []
     for e in goals:
         home = e.get("homeScorer") is not None

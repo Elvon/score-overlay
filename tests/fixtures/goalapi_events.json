@@ -3,5 +3,6 @@
   {"time": "37", "timeNum": 37, "type": "GOAL", "homeScorer": null, "awayScorer": "A. Nusa", "info": "Penalty", "score": "1 - 2"},
   {"time": "14", "timeNum": 14, "type": "GOAL", "homeScorer": null, "awayScorer": "T. Moffi", "info": null, "score": "1 - 1"},
   {"time": "45+2", "type": "GOAL", "homeScorer": "", "awayScorer": null, "info": null, "score": "2 - 2"},
+  {"time": "60", "timeNum": 60, "type": "GOAL", "homeScorer": null, "awayScorer": "B. C", "info": null, "score": "2 - 3"},
   {"time": "50", "timeNum": 50, "type": "CARD", "homeScorer": "X", "awayScorer": null, "info": null}
 ]

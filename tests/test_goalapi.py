@@ -87,4 +87,5 @@ def test_parse_goals_from_events():
         Goal("10'", "W. Omari", True, own_goal=True),
         Goal("14'", "T. Moffi", False),
         Goal("37'", "A. Nusa", False, penalty=True),
-        Goal("45+2'", "?", True))
+        Goal("45+2'", "?", True),
+        Goal("60'", "B. C", False))

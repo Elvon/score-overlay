@@ -312,3 +312,12 @@ def test_goal_details_dropped_after_the_matchday():
     service.fetchers = {"bl1": lambda now: [OLDB_NEXT_WEEK]}
     service.refresh(NOW + timedelta(days=1))
     assert service.goal_details == {}
+
+
+def test_goal_details_failures_count_towards_retries():
+    live, goals = LiveSource([ga_live(1, 0)]), GoalsSource()
+    goals.goals = OSError("404")
+    service = goal_service(live, goals)
+    for minute in range(10):
+        service.refresh(NOW + timedelta(minutes=minute))
+    assert len(goals.calls) == GOALS_RETRIES

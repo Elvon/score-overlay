@@ -132,8 +132,9 @@ class ScoreService:
                 try:
                     goals = self.goals_fetch(m.ref)
                     self.goal_details[m.ref] = (total, goals, tries + 1)
-                except Exception:
+                except Exception:  # counts as a try: a broken fixture must not eat the daily quota
                     log.warning("goals for %s failed", m.ref, exc_info=True)
+                    self.goal_details[m.ref] = (total, goals, tries + 1)
             result.append(replace(m, goals=goals))
         return result
 
