@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from datetime import datetime, timezone
 
-from overlay.model import Match, Status
+from overlay.model import Goal, Match, Status
 from overlay.ui import format_next
 
 
@@ -201,3 +201,85 @@ def test_other_goal_flash_is_short_and_yellow():
     from overlay import ui
     assert ui.FLASH["other"] == "#ffdc00"
     assert ui.FLASH_SECONDS == {"for": 10, "against": 10, "other": 4}
+
+
+TIP_KICK = datetime(2026, 11, 7, 14, 30, tzinfo=timezone.utc)
+
+
+class FakeWindow:
+    def __init__(self):
+        self.destroyed = 0
+
+    def destroy(self):
+        self.destroyed += 1
+
+
+class FakeLabel:
+    def __init__(self):
+        self.text = None
+
+    def config(self, text):
+        self.text = text
+
+
+def test_tooltip_lines_german():
+    from overlay import ui
+    m = Match("BL", "A", "B", 2, 1, Status.LIVE, TIP_KICK,
+              goals=(Goal("11'", "M. Muheim", True, penalty=True), Goal("44'", "J. Scally", False),
+                     Goal("70'", "K. L", True, own_goal=True)))
+    assert ui.tooltip_lines(m) == [f"BL · {TIP_KICK.astimezone():%H:%M}",
+                                   "11'  1:0  M. Muheim (Elfm.)", "44'  1:1  J. Scally",
+                                   "70'  2:1  K. L (ET)", "Klick: Google-Suche"]
+
+
+def test_tooltip_lines_english_without_goals():
+    from overlay import i18n, ui
+    i18n.set_language("en")
+    m = Match("RLB", "1860", "X", None, None, Status.SCHEDULED, TIP_KICK)
+    assert ui.tooltip_lines(m) == [f"RLB · {TIP_KICK.astimezone():%H:%M}", "Click: Google search"]
+
+
+def test_tooltip_marks_in_english():
+    from overlay import i18n, ui
+    i18n.set_language("en")
+    m = Match("BL", "A", "B", 0, 2, Status.LIVE, TIP_KICK,
+              goals=(Goal("5'", "X", False, penalty=True), Goal("9'", "Y", False, own_goal=True)))
+    assert ui.tooltip_lines(m)[1:3] == ["5'  0:1  X (pen.)", "9'  0:2  Y (o.g.)"]
+
+
+def test_tooltip_position_clamped():
+    from overlay import ui
+    assert ui.tooltip_position(500, 300, 200, 100, (0, 0, 1920, 1080)) == (288, 316)
+    assert ui.tooltip_position(100, 1050, 200, 100, (0, 0, 1920, 1080)) == (0, 980)
+
+
+def tooltip_overlay():
+    from overlay import ui
+    o = ui.Overlay.__new__(ui.Overlay)
+    o.popup = ui.PopupGuard()
+    o.tooltip, o.tooltip_label, o.tooltip_key, o._tooltip_after = FakeWindow(), FakeLabel(), ("k",), None
+    o.popup.__enter__()  # as _show_tooltip does
+    return o
+
+
+def test_tooltip_guard_released_however_often_hidden():
+    o = tooltip_overlay()
+    window = o.tooltip
+    o._hide_tooltip()
+    o._hide_tooltip()
+    assert (o.popup.depth, o.tooltip, window.destroyed) == (0, None, 1)
+
+
+def test_redraw_hides_tooltip_of_vanished_match():
+    o = tooltip_overlay()
+    o.row_matches = {}
+    o._sync_tooltip()
+    assert (o.popup.depth, o.tooltip) == (0, None)
+
+
+def test_redraw_updates_tooltip_of_shown_match():
+    o = tooltip_overlay()
+    m = Match("BL", "A", "B", 1, 0, Status.LIVE, TIP_KICK, goals=(Goal("3'", "Z", True),))
+    o.row_matches = {("k",): m}
+    o._sync_tooltip()
+    assert o.popup.depth == 1 and "3'  1:0  Z" in o.tooltip_label.text

@@ -33,6 +33,7 @@ FLASH_SECONDS = {"for": 10, "against": 10, "other": 4}
 FLASH_MS = 400
 TOPMOST_EVERY_MS = 5000
 POLL_MS = 500
+TOOLTIP_HIDE_MS = 80  # moving between the cells of a row must not close the tooltip
 MUTEX_NAME = "score-overlay-single-instance"
 REPO_URL = "https://codeberg.org/ElvonMF/score-overlay"
 LICENSE_NAME = "GPL-3.0-or-later"
@@ -94,6 +95,25 @@ def format_score(m: Match, stale: bool) -> str:
     else:
         score = f"{m.home_goals}:{m.away_goals}"
     return score + "?" if stale else score
+
+
+def tooltip_lines(m: Match) -> list[str]:
+    lines = [f"{m.competition} · {m.kickoff.astimezone():%H:%M}"]
+    home = away = 0
+    for g in m.goals:
+        home, away = (home + 1, away) if g.home else (home, away + 1)
+        mark = t("goal_penalty") if g.penalty else t("goal_own") if g.own_goal else ""
+        lines.append(f"{g.minute}  {home}:{away}  {g.scorer}{mark}")
+    lines.append(t("tooltip_click"))
+    return lines
+
+
+def tooltip_position(x: int, y: int, width: int, height: int,
+                     desktop: tuple[int, int, int, int]) -> tuple[int, int]:
+    """Left below the mouse pointer, kept on the virtual desktop."""
+    dx, dy, dw, dh = desktop
+    return (min(max(x - width - 12, dx), dx + dw - width),
+            min(max(y + 16, dy), dy + dh - height))
 
 
 def wants_sound(goals: dict[Match, str]) -> bool:
@@ -158,6 +178,11 @@ class Overlay:
         self.flashing: dict[tuple, tuple[str, float]] = {}
         self.flash_on = False
         self.last_render: tuple | None = None
+        self.row_matches: dict[tuple, Match] = {}
+        self.tooltip: tk.Toplevel | None = None
+        self.tooltip_label: tk.Label | None = None
+        self.tooltip_key: tuple | None = None
+        self._tooltip_after: str | None = None
 
         self.root = tk.Tk()
         self.root.overrideredirect(True)
@@ -272,6 +297,7 @@ class Overlay:
         for w in self.table.winfo_children():
             w.destroy()
         self.row_labels = {}
+        self.row_matches = {}
         for row, m in enumerate(matches):
             weight = "bold" if is_focus(m) else "normal"
             is_stale = m in stale
@@ -283,8 +309,12 @@ class Overlay:
                 label = tk.Label(self.table, text=text, font=(FONT, 10, weight), fg=color, bg=BG,
                                  anchor=anchor)
                 label.grid(row=row, column=col, sticky="ew", padx=3)
+                label.bind("<Enter>", lambda e, key=_key(m): self._show_tooltip(key, e))
+                label.bind("<Leave>", lambda e: self._schedule_hide_tooltip())
                 labels.append(label)
             self.row_labels[_key(m)] = (labels, color)
+            self.row_matches[_key(m)] = m
+        self._sync_tooltip()
 
         start = time.monotonic()
         for m, kind in goals.items():
@@ -331,7 +361,57 @@ class Overlay:
             self.root.lift()
         self.root.after(TOPMOST_EVERY_MS, self._keep_on_top)
 
+    # --- tooltip ---------------------------------------------------------
+    def _show_tooltip(self, key: tuple, event) -> None:
+        self._cancel_hide_tooltip()
+        m = self.row_matches.get(key)
+        if m is None:
+            return
+        if self.tooltip is None:
+            self.tooltip = tk.Toplevel(self.root, bg=BG)
+            self.tooltip.overrideredirect(True)
+            self.tooltip.attributes("-topmost", True)
+            self.tooltip_label = tk.Label(self.tooltip, font=(FONT, 9), fg=FG, bg=BG, justify="left",
+                                          padx=8, pady=4)
+            self.tooltip_label.pack()
+            self.popup.__enter__()  # keep _keep_on_top from raising the overlay above it
+        self.tooltip_key = key
+        self.tooltip_label.config(text="\n".join(tooltip_lines(m)))
+        self.tooltip.update_idletasks()
+        x, y = tooltip_position(event.x_root, event.y_root, self.tooltip.winfo_reqwidth(),
+                                self.tooltip.winfo_reqheight(), _virtual_desktop())
+        self.tooltip.geometry(f"+{x}+{y}")
+
+    def _schedule_hide_tooltip(self) -> None:
+        self._cancel_hide_tooltip()
+        self._tooltip_after = self.root.after(TOOLTIP_HIDE_MS, self._hide_tooltip)
+
+    def _cancel_hide_tooltip(self) -> None:
+        if self._tooltip_after is not None:
+            self.root.after_cancel(self._tooltip_after)
+            self._tooltip_after = None
+
+    def _hide_tooltip(self) -> None:
+        """Safe to call any number of times; leaves the popup guard exactly once."""
+        self._cancel_hide_tooltip()
+        if self.tooltip is None:
+            return
+        self.tooltip.destroy()
+        self.tooltip = self.tooltip_label = self.tooltip_key = None
+        self.popup.__exit__(None, None, None)
+
+    def _sync_tooltip(self) -> None:
+        """After a redraw: refresh the open tooltip, or close it if its match is gone."""
+        if self.tooltip is None:
+            return
+        m = self.row_matches.get(self.tooltip_key)
+        if m is None:
+            self._hide_tooltip()
+        else:
+            self.tooltip_label.config(text="\n".join(tooltip_lines(m)))
+
     def _show_menu(self, event) -> None:
+        self._hide_tooltip()
         with self.popup:  # tk_popup blocks on Windows until the menu is closed
             self.menu.tk_popup(event.x_root, event.y_root)
 
@@ -441,6 +521,7 @@ class Overlay:
     def _drag_move(self, event) -> None:
         if getattr(self, "_offset", None) is None:
             return
+        self._hide_tooltip()
         x = event.x_root - self._offset[0]
         y = event.y_root - self._offset[1]
         self.root.geometry(f"+{x}+{y}")
