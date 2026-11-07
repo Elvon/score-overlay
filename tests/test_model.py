@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from datetime import date, datetime, timezone
 
-from overlay.model import HALF_TIME, Match, Status, season_for
+from overlay.model import HALF_TIME, Goal, Match, Status, season_for
 
 
 def test_season_for():
@@ -18,3 +18,12 @@ def test_match_is_hashable():
 
 def test_half_time_marker_is_language_neutral():
     assert HALF_TIME == "HT"
+
+
+def test_goals_and_ref_do_not_affect_identity():
+    k = datetime(2026, 11, 7, 14, 30, tzinfo=timezone.utc)
+    a = Match("BL", "A", "B", 1, 0, Status.LIVE, k)
+    b = Match("BL", "A", "B", 1, 0, Status.LIVE, k,
+              goals=(Goal("12'", "X. Y", True),), ref="abc")
+    assert a == b and hash(a) == hash(b)
+    assert b.goals[0] == Goal("12'", "X. Y", True, penalty=False, own_goal=False)

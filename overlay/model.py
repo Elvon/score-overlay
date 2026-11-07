@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from enum import Enum
 
@@ -18,6 +18,15 @@ HALF_TIME = "HT"
 
 
 @dataclass(frozen=True)
+class Goal:
+    minute: str      # as displayed, e.g. "12'" or "90+2'"
+    scorer: str
+    home: bool       # counts for the home team (also for own goals)
+    penalty: bool = False
+    own_goal: bool = False
+
+
+@dataclass(frozen=True)
 class Match:
     competition: str
     home: str
@@ -27,6 +36,9 @@ class Match:
     status: Status
     kickoff: datetime  # timezone-aware UTC
     minute: str | None = None
+    # Details only; not part of a match's identity (goal flashes, stale sets, merging).
+    goals: tuple[Goal, ...] = field(default=(), compare=False)
+    ref: str | None = field(default=None, compare=False)  # id at goal-api.com
 
 
 def season_for(d: date) -> int:
