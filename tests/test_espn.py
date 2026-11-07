@@ -50,3 +50,23 @@ def test_schedule_returns_upcoming_vfb_matches():
     assert atletico.competition == "UCL"
     # the match that is live in the fixture is left to the scoreboard source
     assert not any(m.home == "Slovan Bratislava" for m in matches)
+
+
+def test_espn_goals_from_details():
+    m = next(m for m in parse(load(), "UCL") if m.home == "VfB Stuttgart")
+    assert [(x.minute, x.scorer, x.home) for x in m.goals] == [
+        ("20'", "E. Demirovic", True), ("22'", "Z. Tripic", False),
+        ("26'", "E. Demirovic", True), ("32'", "E. Demirovic", True)]
+
+
+def test_espn_penalty_and_own_goal():
+    m = next(m for m in parse(load(), "UCL") if m.home == "Sporting CP")
+    assert m.goals[0].own_goal and not m.goals[0].home  # credited to Galatasaray
+    assert m.goals[2].penalty and m.goals[2].home
+
+
+def test_espn_shootout_ignored():
+    event = copy.deepcopy(load()["events"][0])
+    for d in event["competitions"][0]["details"]:
+        d["shootout"] = True
+    assert parse({"events": [event]}, "UCL")[0].goals == ()

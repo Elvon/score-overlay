@@ -2,7 +2,7 @@
 """ESPN scoreboard: international club competitions (UCL, UEL, UECL)."""
 from datetime import date, datetime
 
-from overlay.model import Match, Status
+from overlay.model import Goal, Match, Status
 from overlay.sources.http import get_json
 
 URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/{league}/scoreboard?dates={day:%Y%m%d}"
@@ -17,6 +17,22 @@ def _goals(team: dict) -> int | None:
         return int(team["score"])
     except (KeyError, TypeError, ValueError):
         return None
+
+
+def _goal_details(comp: dict, home_id: str) -> tuple[Goal, ...]:
+    goals = []
+    for d in comp.get("details") or []:
+        if not d.get("scoringPlay") or d.get("shootout"):
+            continue
+        athletes = d.get("athletesInvolved") or [{}]
+        goals.append(Goal(
+            minute=(d.get("clock") or {}).get("displayValue") or "",
+            scorer=athletes[0].get("shortName") or athletes[0].get("displayName") or "?",
+            home=(d.get("team") or {}).get("id") == home_id,
+            penalty=bool(d.get("penaltyKick")),
+            own_goal=bool(d.get("ownGoal")),
+        ))
+    return tuple(goals)
 
 
 def parse(data: dict, competition: str) -> list[Match]:
@@ -35,6 +51,7 @@ def parse(data: dict, competition: str) -> list[Match]:
             status=status,
             kickoff=datetime.fromisoformat(event["date"].replace("Z", "+00:00")),
             minute=event["status"].get("displayClock") if live else None,
+            goals=() if scheduled else _goal_details(event["competitions"][0], teams["home"].get("id")),
         ))
     return matches
 
