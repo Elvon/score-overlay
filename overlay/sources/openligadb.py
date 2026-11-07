@@ -2,7 +2,7 @@
 """OpenLigaDB: Bundesliga (bl1), DFB-Pokal (dfb), Frauen-Bundesliga (ffb1)."""
 from datetime import datetime
 
-from overlay.model import LIVE_MAX, Match, Status, season_for
+from overlay.model import LIVE_MAX, Goal, Match, Status, season_for
 from overlay.sources.http import get_json
 
 URL = "https://api.openligadb.de/getmatchdata/{league}/{season}"
@@ -23,6 +23,22 @@ def _score(m: dict) -> tuple[int, int] | None:
         r = max(results, key=lambda r: r.get("resultOrderID", 0))
         return r["pointsTeam1"], r["pointsTeam2"]
     return None
+
+
+def _goals(m: dict) -> tuple[Goal, ...]:
+    goals = []
+    before = 0
+    for g in sorted(m.get("goals") or [], key=lambda g: g["scoreTeam1"] + g["scoreTeam2"]):
+        minute = g.get("matchMinute")
+        goals.append(Goal(
+            minute=f"{minute}'" if minute is not None else "",
+            scorer=g.get("goalGetterName") or "?",
+            home=g["scoreTeam1"] > before,
+            penalty=bool(g.get("isPenalty")),
+            own_goal=bool(g.get("isOwnGoal")),
+        ))
+        before = g["scoreTeam1"]
+    return tuple(goals)
 
 
 def parse(data: list[dict], competition: str, now: datetime) -> list[Match]:
@@ -50,6 +66,7 @@ def parse(data: list[dict], competition: str, now: datetime) -> list[Match]:
             away_goals=score[1] if score else None,
             status=status,
             kickoff=kickoff,
+            goals=() if status is Status.SCHEDULED else _goals(m),
         ))
     return matches
 

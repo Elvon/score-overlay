@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from overlay.model import Status
+from overlay.model import Goal, Status
 from overlay.sources.openligadb import parse
 
 FIX = Path(__file__).parent / "fixtures"
@@ -68,3 +68,32 @@ def test_live_prefers_newer_goal_over_halftime_result():
                    goals=[{"scoreTeam1": 2, "scoreTeam2": 0}, {"scoreTeam1": 1, "scoreTeam2": 0}])]
     m = parse(data, "BL", NOW)[0]
     assert (m.home_goals, m.away_goals, m.status) == (2, 0, Status.LIVE)
+
+
+def oldb_match(goals):
+    return {"matchDateTimeUTC": "2026-10-11T11:00:00Z", "matchIsFinished": False, "matchResults": [],
+            "team1": {"teamName": "A"}, "team2": {"teamName": "B"}, "goals": goals}
+
+
+def g(s1, s2, minute, name, pen=False, og=False):
+    return {"scoreTeam1": s1, "scoreTeam2": s2, "matchMinute": minute, "goalGetterName": name,
+            "isPenalty": pen, "isOwnGoal": og}
+
+
+def test_goals_with_side_from_score_sorted():
+    m = parse([oldb_match([g(1, 1, 44, "J. Scally"), g(1, 0, 11, "M. Muheim", pen=True),
+                           g(2, 1, 70, "K. L", og=True)])], "BL", NOW)[0]
+    assert m.goals == (Goal("11'", "M. Muheim", True, penalty=True),
+                       Goal("44'", "J. Scally", False),
+                       Goal("70'", "K. L", True, own_goal=True))
+
+
+def test_goal_without_name_or_minute():
+    m = parse([oldb_match([g(1, 0, None, None)])], "BL", NOW)[0]
+    assert m.goals == (Goal("", "?", True),)
+
+
+def test_scheduled_match_has_no_goals():
+    data = oldb_match([g(1, 0, 5, "X")])
+    data["matchDateTimeUTC"] = "2026-10-11T18:00:00Z"
+    assert parse([data], "BL", NOW)[0].goals == ()
