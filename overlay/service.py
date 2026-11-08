@@ -62,7 +62,7 @@ def default_fetchers(goal_api_key: str | None = None) -> dict[str, Fetcher]:
 
 
 def goal_api_live_fetch(key: str) -> LiveFetcher:
-    return lambda comp, now: goalapi.fetch(comp, now.astimezone().date(), key)
+    return lambda comp, now: goalapi.fetch(comp, now.astimezone().date(), key, now)
 
 
 def goal_api_goals_fetch(key: str) -> GoalsFetcher:

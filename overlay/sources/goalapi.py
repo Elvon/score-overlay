@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """goal-api.com (needs a free API key): reliable live scores for today's matches."""
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
-from overlay.model import HALF_TIME, Goal, Match, Status
+from overlay.model import HALF_TIME, LIVE_MAX, Goal, Match, Status
 from overlay.sources.http import get_json
 
 BASE = "https://api.goal-api.com/v1"
@@ -25,6 +25,8 @@ COMPETITIONS_BY_NAME = {
 }
 LIVE_PERIODS = {"FIRST_HALF", "SECOND_HALF", "EXTRA_TIME", "PENALTIES"}
 OWN_GOAL = " (o.g.)"
+# goal-api.com sometimes never ends a match; past these it counts as finished.
+SECOND_HALF_MAX = timedelta(hours=2, minutes=30)
 
 
 def _goals(value) -> int | None:
@@ -39,10 +41,19 @@ def _name(f: dict, side: str) -> str:
     return name[:-2] + " Frauen" if name.endswith(" W") else name
 
 
-def parse(fixtures: list[dict], competition: str) -> list[Match]:
+def _stuck(period: str, kickoff: datetime, now: datetime | None) -> bool:
+    if now is None or period not in LIVE_PERIODS | {"HALF_TIME"}:
+        return False
+    return now > kickoff + (SECOND_HALF_MAX if period == "SECOND_HALF" else LIVE_MAX)
+
+
+def parse(fixtures: list[dict], competition: str, now: datetime | None = None) -> list[Match]:
     matches = []
     for f in fixtures:
         period = f.get("matchPeriod")
+        kickoff = datetime.fromisoformat(f["kickoffUtc"].replace("Z", "+00:00"))
+        if _stuck(period, kickoff, now):
+            period = "FINISHED"
         if period == "NOT_STARTED":
             status, minute = Status.SCHEDULED, None
         elif period == "FINISHED":
@@ -61,7 +72,7 @@ def parse(fixtures: list[dict], competition: str) -> list[Match]:
             home_goals=None if scheduled else _goals(f.get("homeTeamScore")),
             away_goals=None if scheduled else _goals(f.get("awayTeamScore")),
             status=status,
-            kickoff=datetime.fromisoformat(f["kickoffUtc"].replace("Z", "+00:00")),
+            kickoff=kickoff,
             minute=minute,
             ref=f.get("id"),
         ))
@@ -101,9 +112,9 @@ def fetch_goals(fixture_id: str, key: str) -> tuple[Goal, ...]:
     return parse_goals(data["data"] if isinstance(data, dict) else data)
 
 
-def fetch(competition: str, day: date, key: str) -> list[Match]:
+def fetch(competition: str, day: date, key: str, now: datetime | None = None) -> list[Match]:
     url = f"{BASE}/fixtures/date/{day:%Y-%m-%d}?leagueId={LEAGUES[competition]}&limit=100"
-    return parse(get_json(url, headers={"Authorization": f"Bearer {key}"})["data"], competition)
+    return parse(get_json(url, headers={"Authorization": f"Bearer {key}"})["data"], competition, now)
 
 
 def competition_of(league_name: str) -> str | None:

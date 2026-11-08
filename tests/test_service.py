@@ -170,9 +170,9 @@ def test_goal_api_live_fetch_uses_local_date_and_key(monkeypatch):
     from overlay import service as svc
     seen = {}
     monkeypatch.setattr(svc.goalapi, "fetch",
-                        lambda comp, day, key: seen.update(comp=comp, day=day, key=key) or [])
+                        lambda comp, day, key, now: seen.update(comp=comp, day=day, key=key, now=now) or [])
     svc.goal_api_live_fetch("k")("FBL", NOW)
-    assert seen == {"comp": "FBL", "day": NOW.astimezone().date(), "key": "k"}
+    assert seen == {"comp": "FBL", "day": NOW.astimezone().date(), "key": "k", "now": NOW}
 
 
 def test_women_schedule_only_with_goal_api_key():

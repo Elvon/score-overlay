@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from overlay.model import HALF_TIME, Goal, Status
@@ -89,3 +89,18 @@ def test_parse_goals_from_events():
         Goal("37'", "A. Nusa", False, penalty=True),
         Goal("45+2'", "?", True),
         Goal("60'", "B. C", False))
+
+
+def test_second_half_stuck_long_after_kickoff_counts_as_finished():
+    f = _fixture("SECOND_HALF", "90+")
+    kickoff = datetime.fromisoformat(f["kickoffUtc"].replace("Z", "+00:00"))
+    m = parse([f], "BL", now=kickoff + timedelta(hours=2, minutes=31))[0]
+    assert m.status is Status.FINISHED and m.minute is None
+    assert parse([f], "BL", now=kickoff + timedelta(hours=2, minutes=29))[0].status is Status.LIVE
+
+
+def test_extra_time_stays_live_until_live_max():
+    f = _fixture("EXTRA_TIME", "118")
+    kickoff = datetime.fromisoformat(f["kickoffUtc"].replace("Z", "+00:00"))
+    assert parse([f], "DFB", now=kickoff + timedelta(hours=2, minutes=45))[0].status is Status.LIVE
+    assert parse([f], "DFB", now=kickoff + timedelta(hours=3, minutes=1))[0].status is Status.FINISHED
