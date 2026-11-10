@@ -16,6 +16,8 @@ GoalsFetcher = Callable[[str], tuple[Goal, ...]]  # goal-api fixture id -> its g
 LIVE_COMPETITIONS = ("BL", "DFB", "DFBF", "FBL", "RLB")
 # Regular source of each live competition: while it has never answered, goal-api.com is asked anyway.
 LIVE_SOURCES = {"BL": "bl1", "DFB": "dfb", "FBL": "ffb1"}
+# goal-api.com has no live coverage here: matches stay SCHEDULED during play, the result comes afterwards.
+NO_LIVE_DATA = frozenset({"DFBF"})
 RETRY_SECONDS = 60  # retry interval for a source that has not answered once since the start
 TEAM_SCHEDULE_EVERY = timedelta(hours=1)
 LIVE_FAST = timedelta(minutes=1)    # while a match of the competition is live
@@ -166,7 +168,8 @@ class ScoreService:
                 continue
             # Once goal-api answered, trust its view of what is live.
             current = todays(cached) if cached is not None else todays(base)
-            interval = LIVE_FAST if any(is_hot(m, now) for m in current) else LIVE_SLOW
+            hot = comp not in NO_LIVE_DATA and any(is_hot(m, now) for m in current)
+            interval = LIVE_FAST if hot else LIVE_SLOW
             last = self.live_tried.get(comp)
             if last is not None and now - last < interval:
                 continue

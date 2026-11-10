@@ -88,7 +88,8 @@ Hat OpenLigaDB seit dem Start noch nicht geantwortet, kommen die heutigen Spiele
 `config.json` ist nicht im Repository; das Overlay ändert beim Speichern nur seine eigenen Einträge.
 
 Bekannte Lücken: DFB-Pokal der Frauen ohne goal-api.com-Key, Champions League der Frauen, Toto-Pokal. Live-Stände von 1860 können verzögert sein.
-DFB-Pokal der Frauen: goal-api.com liefert nicht für jedes Spiel Live-Stände; solche Spiele erscheinen nach Anpfiff als `HH:MM?`.
+DFB-Pokal der Frauen: goal-api.com hat für diesen Wettbewerb keine Live-Stände. Spiele erscheinen nach Anpfiff als `HH:MM?`,
+der Endstand kommt nach Abpfiff; das Overlay fragt goal-api.com dafür nur alle 30 Minuten.
 Fehler beim Abruf werden in `overlay.log` protokolliert; eine Quelle, die seit dem Start noch nicht geantwortet hat, wird jede Minute neu abgefragt.
 
 ## Hinweis zu Datenquellen

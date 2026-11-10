@@ -366,3 +366,14 @@ def test_goal_api_probe_without_matches_repeats_every_30_minutes():
     for minutes in (0, 10, 30):
         service.refresh(NOW + timedelta(minutes=minutes))
     assert [c for c, _ in live.calls] == ["BL", "BL"]
+
+
+def test_womens_cup_without_live_data_asked_every_30_minutes_during_play():
+    # goal-api.com keeps DFB-Pokal Women matches SCHEDULED during play; the result comes afterwards.
+    overdue = Match("DFBF", "Stuttgart Frauen", "SGS Essen Frauen", None, None, Status.SCHEDULED,
+                    NOW - timedelta(minutes=30))
+    live = LiveSource([overdue])
+    service = ScoreService({"ws": lambda now: [overdue]}, live_fetch=live)
+    for minutes in (0, 1, 10, 29, 30):
+        service.refresh(NOW + timedelta(minutes=minutes))
+    assert len(live.calls) == 2

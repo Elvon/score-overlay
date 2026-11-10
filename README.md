@@ -88,7 +88,8 @@ If OpenLigaDB has not answered since the start, today's matches come from goal-a
 `config.json` is not part of the repository; when saving, the overlay only changes its own entries.
 
 Known gaps: women's DFB-Pokal without a goal-api.com key, women's Champions League, Toto-Pokal. Live scores of 1860 may be delayed.
-Women's DFB-Pokal: goal-api.com does not provide live scores for every match; such matches show as `HH:MM?` after kickoff.
+Women's DFB-Pokal: goal-api.com has no live scores for this competition. Matches show as `HH:MM?` after kickoff
+and the result appears after the final whistle; the overlay asks goal-api.com only every 30 minutes for it.
 Errors while fetching are logged to `overlay.log`; a source that has not answered since the start is retried every minute.
 
 ## Note on data sources

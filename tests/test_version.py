@@ -23,5 +23,5 @@ def test_is_newer():
 
 
 def test_installed_version():
-    assert overlay.__version__ == "1.7.0"
+    assert overlay.__version__ == "1.7.1"
     parse_version(overlay.__version__)
